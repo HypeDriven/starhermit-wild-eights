@@ -1,0 +1,80 @@
+[
+  {
+    "name": "ui-select-tick",
+    "seconds": 1,
+    "prompt": "A single short dry plastic button click, crisp and quiet, no reverb.",
+    "event": "select"
+  },
+  {
+    "name": "ui-select-card",
+    "seconds": 1,
+    "prompt": "A fingernail lightly tapping the edge of a playing card once, thin paper tick.",
+    "event": "select"
+  },
+  {
+    "name": "ui-confirm",
+    "seconds": 1,
+    "prompt": "A small wooden toggle switch flipped firmly to the on position, positive muted click.",
+    "event": "confirm"
+  },
+  {
+    "name": "ui-confirm-chip",
+    "seconds": 1,
+    "prompt": "A single poker chip set down on a polished wooden card table, clean plastic clack.",
+    "event": "confirm"
+  },
+  {
+    "name": "card-play",
+    "seconds": 1,
+    "prompt": "A playing card slapped face-up onto a wooden table, sharp paper snap with a soft knock.",
+    "event": "play"
+  },
+  {
+    "name": "card-play-felt",
+    "seconds": 1,
+    "prompt": "A playing card placed gently onto green felt, soft muffled paper tap.",
+    "event": "play"
+  },
+  {
+    "name": "card-draw",
+    "seconds": 1,
+    "prompt": "A single playing card dealt quickly off the top of a deck, short paper swish.",
+    "event": "draw"
+  },
+  {
+    "name": "wild-eight-chime",
+    "seconds": 2,
+    "prompt": "Three bright ascending brass chimes struck in sequence with a light magical shimmer tail.",
+    "event": "eight"
+  },
+  {
+    "name": "ui-error-buzz",
+    "seconds": 1,
+    "prompt": "A single low dull knock on hollow wood, short negative thud, no ringing.",
+    "event": "error"
+  },
+  {
+    "name": "victory-fanfare",
+    "seconds": 3,
+    "prompt": "A short triumphant brass fanfare, four rising trumpet notes ending on a bright held chord.",
+    "event": "win"
+  },
+  {
+    "name": "defeat-descend",
+    "seconds": 2,
+    "prompt": "Three slow descending muted trombone notes, gentle and sad, fading softly.",
+    "event": "lose"
+  },
+  {
+    "name": "turn-notify",
+    "seconds": 1,
+    "prompt": "A small brass desk bell tapped once with a metal striker, soft clear ding.",
+    "event": "turn"
+  },
+  {
+    "name": "turn-tap",
+    "seconds": 1,
+    "prompt": "Two knuckles knocking lightly twice on a wooden railway compartment table.",
+    "event": "turn"
+  }
+]
