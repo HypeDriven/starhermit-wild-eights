@@ -56,7 +56,10 @@
     options = options || {};
     var players = options.players || 4;
     if (players < 2 || players > 4) throw new Error("players must be 2..4");
-    var handSize = options.handSize || (players === 2 ? 7 : 7);
+    var handSize = options.handSize || 7;
+    // The deal must leave a starter plus a usable stock; without this an
+    // oversized hand walks off the end of the deck while flipping the starter.
+    if (handSize < 1 || handSize * players > 46) throw new Error("handSize does not fit the deck");
     var state = {
       version: RULES_VERSION,
       seed: seed >>> 0,
@@ -285,11 +288,30 @@
     } else {
       // Shed highest points, but hold eights unless hand is small or forced.
       playable.sort(function (a, b) { return cardPoints(b) - cardPoints(a); });
-      var nonEight = null;
-      for (var q = 0; q < playable.length; q++) if (playable[q].rank !== 8) { nonEight = playable[q]; break; }
-      if (difficulty >= 2 && nonEight && hand2.length > 2) pick = nonEight;
-      else if (hand2.length > 2 && nonEight) pick = nonEight;
-      else pick = playable[0];
+      var nonEights = [];
+      for (var q = 0; q < playable.length; q++) if (playable[q].rank !== 8) nonEights.push(playable[q]);
+      if (nonEights.length === 0 || hand2.length <= 2) {
+        pick = playable[0];
+      } else if (difficulty >= 2) {
+        // Expert looks one ply ahead: it prefers the discard that leaves the
+        // most of its own hand playable on the next turn, shedding points as a
+        // tie-break. (Difficulty 1 only sheds points.)
+        pick = nonEights[0];
+        var bestScore = -1;
+        for (var e = 0; e < nonEights.length; e++) {
+          var cand = nonEights[e];
+          var follow = 0;
+          for (var h = 0; h < hand2.length; h++) {
+            var other = hand2[h];
+            if (other.id === cand.id) continue;
+            if (other.rank === 8 || other.suit === cand.suit || other.rank === cand.rank) follow++;
+          }
+          var sc = follow * 10 + cardPoints(cand);
+          if (sc > bestScore) { bestScore = sc; pick = cand; }
+        }
+      } else {
+        pick = nonEights[0];
+      }
     }
     return { type: "play", cardId: pick.id };
   }
@@ -309,13 +331,24 @@
     };
   }
 
+  function publicSnapshot(s, seat) {
+    var view = serialize(s);
+    view.seed = 0; view.rngState = 0;
+    view.hands = view.hands.map(function (h, i) { return i === seat ? h : h.map(function () { return null; }); });
+    view.stock = view.stock.map(function () { return null; });
+    return view;
+  }
+
   var DECK = buildDeck();
   function cardById(id) {
     if (typeof id !== "number" || id < 0 || id > 51) throw new Error("bad card id " + id);
     return DECK[id];
   }
 
-  function deserialize(o) {
+  function deserialize(o, publicSeat) {
+    function decodeCard(id) {
+      return publicSeat != null && id === null ? { id: -1, rank: 0, suit: "?" } : cardById(id);
+    }
     if (!o || typeof o !== "object") throw new Error("bad state");
     if (typeof o.seed !== "number" || typeof o.tick !== "number") throw new Error("bad header");
     if (!Array.isArray(o.hands) || !Array.isArray(o.stock) || !Array.isArray(o.discardPile)) throw new Error("bad piles");
@@ -328,14 +361,16 @@
       winner: o.winner === undefined ? null : o.winner,
       terminalReason: o.terminalReason || null,
       activeSuit: o.activeSuit, pendingSuitFor: o.pendingSuitFor === undefined ? null : o.pendingSuitFor,
-      hands: o.hands.map(function (h) { return h.map(cardById); }),
-      stock: o.stock.map(cardById),
+      hands: o.hands.map(function (h) { return h.map(decodeCard); }),
+      stock: o.stock.map(decodeCard),
       discardPile: o.discardPile.map(cardById),
       moveCount: o.moveCount || 0,
       invalidActions: o.invalidActions || 0,
       score: o.score || null,
       log: []
     };
+    // Public views contain counted placeholders, not a replayable full deck.
+    if (publicSeat != null) return s;
     // integrity: all 52 cards exactly once
     var seen = new Array(52).fill(false);
     var mark = function (c) { if (seen[c.id]) throw new Error("duplicate card " + c.id); seen[c.id] = true; };
@@ -382,7 +417,7 @@
     rankName: rankName, cardName: cardName, cardPoints: cardPoints, cardById: cardById,
     newGame: newGame, legalActions: legalActions, applyCommand: applyCommand,
     aiCommand: aiCommand, canPlay: canPlay,
-    serialize: serialize, deserialize: deserialize, hash: hash, replay: replay,
+    serialize: serialize, publicSnapshot: publicSnapshot, deserialize: deserialize, hash: hash, replay: replay,
     dailySeed: dailySeed
   };
 });

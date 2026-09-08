@@ -216,12 +216,29 @@ import * as THREE from "./three.module.min.js";
     resize();
   }
 
+  // Camera framing. The viewing angle is fixed; only the distance adapts, so
+  // the whole table — every seated hand included — stays inside the canvas on a
+  // wide desktop strip and on a square/tall phone playfield alike. Without this
+  // the near hand is cropped by the bottom edge on narrow viewports.
+  var FIT_RADIUS = 7.6;
+  var CAM_TARGET = new THREE.Vector3(0, 0.4, 0);
+  var CAM_DIR = new THREE.Vector3(0, -13.6, 12.6).normalize();
+
+  function frameCamera() {
+    var vHalf = Math.tan((camera.fov * Math.PI) / 360);
+    var hHalf = vHalf * camera.aspect;
+    var dist = Math.max(FIT_RADIUS / vHalf, FIT_RADIUS / hHalf);
+    camera.position.copy(CAM_TARGET).addScaledVector(CAM_DIR, dist);
+    camera.lookAt(CAM_TARGET);
+  }
+
   function resize() {
     if (!renderer || !container) return;
     var w = container.clientWidth || 300;
     var h = container.clientHeight || 300;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    frameCamera();
     camera.updateProjectionMatrix();
   }
 
@@ -240,8 +257,7 @@ import * as THREE from "./three.module.min.js";
     scene = new THREE.Scene();
     scene.background = new THREE.Color(theme.wall);
     camera = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
-    camera.position.set(0, -12.6, 12.6);
-    camera.lookAt(0, 1.0, 0);
+    frameCamera();
 
     ambLight = new THREE.AmbientLight(0xfff2df, 0.5);
     scene.add(ambLight);
@@ -378,20 +394,26 @@ import * as THREE from "./three.module.min.js";
     return { angle: a, x: Math.cos(a) * 5.4, y: Math.sin(a) * 5.4 };
   }
 
-  // Render a full immutable snapshot. opts: { legalPlays:[ids], onTurn, selectedCardId, animate }
+  // Render a full immutable snapshot.
+  // opts: { legalPlays:[ids], onTurn, selectedCardId, mySeat, animate }
+  // The local seat (mySeat, default 0) is drawn face up at the bottom of the
+  // table; every other hand is face down, so a hosted seat never sees another
+  // player's cards.
   function renderState(state, opts) {
     opts = opts || {};
     disposeCards();
     legalCardIds = opts.legalPlays || [];
     onTurn = !!opts.onTurn;
     var players = state.players;
+    var mySeat = opts.mySeat || 0;
 
     for (var seat = 0; seat < players; seat++) {
-      var st = seatTransform(seat, players);
+      var visualSeat = (seat - mySeat + players) % players;
+      var st = seatTransform(visualSeat, players);
       var hand = state.hands[seat];
       var arr = [];
       var n = hand.length;
-      var isMe = seat === 0;
+      var isMe = seat === mySeat;
       var faceUp = isMe;
       for (var i = 0; i < n; i++) {
         var card = hand[i];
@@ -423,7 +445,7 @@ import * as THREE from "./three.module.min.js";
           markerMesh.visible = true;
         }
       }
-      handMeshes.push(arr);
+      handMeshes[visualSeat] = arr; // index 0 is always the local seat (picking)
     }
     if (!handMeshes[0] || !handMeshes[0].some(function (h) { return legalCardIds.indexOf(h.cardId) >= 0; })) {
       markerMesh.visible = false;

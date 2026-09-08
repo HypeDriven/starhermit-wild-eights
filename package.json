@@ -1,1 +1,18 @@
-{"name":"wild-eights","version":"1.0.0","description":"Wild Eights — railway-compartment card game (browser + authoritative host)","scripts":{"test":"node tests.js","start":"node server.js"},"dependencies":{"three":"^0.185.1","ws":"^8.21.3"},"devDependencies":{"playwright-core":"^1.62.1"}}
+{
+  "name": "wild-eights",
+  "version": "1.0.0",
+  "description": "Wild Eights \u2014 railway-compartment card game (browser + authoritative host)",
+  "scripts": {
+    "test": "node tests.js",
+    "start": "node server.js",
+    "test:e2e": "node tests/e2e.mjs"
+  },
+  "dependencies": {
+    "three": "^0.185.1",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
+}

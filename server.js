@@ -53,7 +53,10 @@ const server = http.createServer((req, res) => {
     // Static file, path-traversal safe.
     const rel = decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname);
     const file = path.normalize(path.join(ROOT, rel));
-    if (!file.startsWith(ROOT) || file.includes("node_modules")) {
+    // startsWith(ROOT) alone would also accept a sibling directory whose name
+    // merely begins with ROOT (e.g. ../wild-eights-backup), so compare on the
+    // path separator boundary.
+    if ((file !== ROOT && !file.startsWith(ROOT + path.sep)) || file.includes("node_modules") || rel.split("/").some(part => part.startsWith("."))) {
       res.writeHead(403); res.end("forbidden\n"); return;
     }
     fs.stat(file, (err, st) => {
@@ -78,8 +81,8 @@ function makeCode() {
   return tables[code] ? makeCode() : code;
 }
 
-function tableSnapshot(t) {
-  return W.serialize(t.state);
+function tableSnapshot(t, seat) {
+  return W.publicSnapshot(t.state, seat);
 }
 
 function broadcast(t, obj) {
@@ -107,9 +110,9 @@ function sendState(t, events, onlySeat) {
     try {
       p.ws.send(JSON.stringify({
         type: "state",
-        snapshot: tableSnapshot(t),
+        snapshot: tableSnapshot(t, p.seat),
         yourSeat: p.seat,
-        events: events || [],
+        events: (events || []).map(e => e.type === "draw" && e.player !== p.seat ? { ...e, cardIds: undefined } : e),
         away: away
       }));
     } catch (e) { /* reconnect path covers */ }

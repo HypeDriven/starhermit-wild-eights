@@ -88,6 +88,7 @@
     document.body.classList.toggle("left-handed", s.leftHanded);
     $("btn-sound").textContent = s.muted ? "🔇 Muted" : "🔊 Sound";
     $("btn-sound").setAttribute("aria-pressed", String(!s.muted));
+    $("btn-sound").title = s.muted ? "Unmute all audio" : "Mute all audio";
     if (UI.isReady()) {
       UI.setReducedMotion(s.reducedMotion);
       UI.setQuality(s.quality);
@@ -176,12 +177,13 @@
     var myHand = session.hosted ? session.seat : 0;
 
     if (UI.isReady()) {
-      // For hosted seats > 0 we still render from seat 0's visual perspective;
-      // the DOM list shows the actual player's hand.
+      // The board is drawn from this seat's perspective: only our own hand is
+      // face up, and we always sit at the bottom of the table.
       UI.renderState(st, {
         legalPlays: isHuman ? la.plays : [],
         onTurn: isHuman,
-        selectedCardId: selectedCardId
+        selectedCardId: selectedCardId,
+        mySeat: myHand
       });
     }
 
@@ -226,7 +228,11 @@
         session.tutorialStep++;
         t = C.TUTORIAL[session.tutorialStep];
       }
-      if (t) {
+      if (!t) {
+        // The last lesson was auto-skipped as impossible: close out the course.
+        $("tutorial-panel").hidden = true;
+        if (!save.settings.tutorialDone) { save.settings.tutorialDone = true; persist(); }
+      } else {
         $("tutorial-panel").hidden = false;
         $("tutorial-panel").dataset.require = t.require;
         $("tutorial-title").textContent = t.title;
@@ -365,6 +371,9 @@
     var snap = session.undoStack.pop();
     if (!snap) return;
     session.state = W.deserialize(JSON.parse(snap));
+    // serialize() carries no AI settings, so restore the round's difficulty —
+    // otherwise an undo silently drops Relaxed/Expert rivals back to Regular.
+    if (session.options && session.options.difficulty != null) session.state.difficulty = session.options.difficulty;
     // Drop the commands that happened after this snapshot.
     session.commands.length = Math.max(0, session.commands.length - 1);
     session.over = false;
@@ -388,13 +397,14 @@
       b.className = "suit-btn suit-" + suit;
       b.innerHTML = suitGlyph(suit) + "<span>" + suit + " (" + counts[suit] + ")</span>";
       b.addEventListener("click", function () {
-        show(screenStack[screenStack.length - 1] === "game" ? "game" : "game", false);
+        show("game", false);
         screenStack = [];
         commit({ type: "declareSuit", suit: suit });
       });
       grid.appendChild(b);
     });
     show("suit", false);
+    announce("You played an 8. Declare a suit.", true);
   }
 
   // ---------------------------------------------------------------------------
@@ -628,11 +638,18 @@
         show("game", false);
       }
       var prevTick = session.state ? session.state.tick : -1;
-      session.state = W.deserialize(m.snapshot);
+      session.state = W.deserialize(m.snapshot, m.yourSeat);
       session.over = session.state.winner !== null;
       if (m.away && m.away.length) announce("While you were away: " + m.away.join(" "), true);
       if (m.events) UI.playEvents(m.events, session.state);
       rerender();
+      // The server holds the round until this seat declares a suit, so the
+      // picker has to be driven from the authoritative snapshot too.
+      if (!session.over && session.state.pendingSuitFor === session.seat) {
+        openSuitPicker();
+        return;
+      }
+      if (currentScreen === "suit" && session.state.pendingSuitFor !== session.seat) show("game", false);
       if (!session.over) announceTurn();
       else if (prevTick >= 0) finishRound();
       return;
@@ -724,6 +741,12 @@
   // ---------------------------------------------------------------------------
   // Keyboard controls.
   document.addEventListener("keydown", function (ev) {
+    if (currentScreen === "suit") {
+      // The suit declaration is mandatory: dismissing it would strand the round
+      // with pendingSuitFor set and no way back to the picker.
+      if (ev.key === "Escape") ev.preventDefault();
+      return;
+    }
     if (currentScreen !== "game" || !session) {
       if (ev.key === "Escape" && currentScreen !== "title") back();
       return;
@@ -835,6 +858,7 @@
     $("btn-pause-help").addEventListener("click", function () { show("help"); });
     $("btn-again").addEventListener("click", playAgain);
     $("btn-next-stage").addEventListener("click", function () {
+      if (!session || !session.stageId) return;
       var idx = parseInt(session.stageId.slice(1), 10);
       var next = C.JOURNEY[idx]; // 0-based: idx is next stage
       if (next) startJourneyStage(next);
