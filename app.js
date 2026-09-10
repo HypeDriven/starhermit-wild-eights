@@ -47,6 +47,24 @@
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* private mode: play session-only */ }
   }
 
+  // Platform-time offset (ms), best effort: when a host serves /api/v1/time we
+  // align daily boundaries to it (round-trip adjusted); offline play falls
+  // back to the local clock, which is exact for a solo daily seed.
+  var timeOffset = 0;
+  function nowMs() { return Date.now() + timeOffset; }
+  function syncTime() {
+    if (!window.fetch) return;
+    var t0 = Date.now();
+    window.fetch("/api/v1/time")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || typeof j.epochMs !== "number") return;
+        var rtt = Date.now() - t0;
+        timeOffset = Math.round(j.epochMs + rtt / 2 - Date.now());
+      })
+      .catch(function () { /* no host: local clock it is */ });
+  }
+
   // ---------------------------------------------------------------------------
   // Screen router.
   var currentScreen = "title";
@@ -332,8 +350,9 @@
     if (!session) return;
     var st = session.state;
     if (st.winner !== null) return;
-    if (st.pendingSuitFor === 0) { announce("You played an 8. Declare a suit."); return; }
+    if (st.pendingSuitFor === (session.hosted ? session.seat : 0)) { announce("You played an 8. Declare a suit."); return; }
     if ((session.hosted ? st.current === session.seat : st.current === 0)) {
+      A.play("turn");
       var la = W.legalActions(st);
       announce(la.plays.length ? "Your turn. " + la.plays.length + " playable card" + (la.plays.length > 1 ? "s" : "") + "." : "Your turn. No playable cards — draw.");
     }
@@ -458,7 +477,7 @@
         save.journey[session.stageId] = j;
       }
       if (session.mode === "daily") {
-        var day = new Date().toISOString().slice(0, 10);
+        var day = new Date(nowMs()).toISOString().slice(0, 10);
         if (save.dailyDays.indexOf(day) < 0) save.dailyDays.push(day);
       }
       checkAchievements(won);
@@ -535,7 +554,7 @@
     enterGame();
   }
   function startDaily() {
-    var seed = W.dailySeed(new Date());
+    var seed = W.dailySeed(new Date(nowMs()));
     newLocalSession("daily", { players: 4, difficulty: 1 }, { seed: seed });
     enterGame();
   }
@@ -939,6 +958,7 @@
   // Boot.
   function boot() {
     bind();
+    syncTime();
     var theme = C.THEMES.filter(function (t) { return t.id === save.settings.theme; })[0] || C.THEMES[0];
     try {
       UI.init($("table"), { theme: theme, suitPalette: save.settings.cvdPalette ? "cvd" : "standard" });
