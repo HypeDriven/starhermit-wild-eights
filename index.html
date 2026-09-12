@@ -11,6 +11,7 @@
 <script src="./game.js"></script>
 <script src="./content.js"></script>
 <script src="./audio.js"></script>
+<script src="./platform.js"></script>
 <script type="module" src="./ui.js"></script>
 <script type="module" src="./app.js"></script>
 </head>
@@ -20,6 +21,8 @@
     <h1>Wild Eights</h1>
     <p class="tagline">A railway-compartment card game</p>
     <div class="topbar-actions">
+      <span id="profile-name" class="profile-name" hidden></span>
+      <span id="sync-status" class="sync-status" hidden></span>
       <button type="button" id="btn-sound" aria-pressed="true" title="Mute all audio">🔊 Sound</button>
       <button type="button" id="btn-help-top" title="How to play">?</button>
     </div>
@@ -111,24 +114,28 @@
     <section class="screen" id="screen-hosted" aria-labelledby="hosted-h">
       <h2 id="hosted-h">Hosted play</h2>
       <div id="hosted-join">
-        <p class="muted">Host a private table or join one with a code. The server deals, validates every move, and keeps the authoritative result. Reconnect any time with the same code.</p>
+        <p class="muted">Host a private table or join one with a code. Every move is validated by the authoritative rules engine and empty seats are filled by AI. Reconnect any time — your seat is kept.</p>
         <div class="row">
           <button type="button" class="btn primary" id="btn-host">Host a table</button>
+          <button type="button" class="btn" id="btn-quick-join" hidden>Quick join</button>
         </div>
         <form id="join-form" class="row">
           <label for="join-code">Table code</label>
-          <input id="join-code" name="code" type="text" inputmode="text" maxlength="8" autocomplete="off" placeholder="e.g. K7QX">
+          <input id="join-code" name="code" type="text" inputmode="text" maxlength="32" autocomplete="off" placeholder="e.g. K7QX">
           <button type="submit" class="btn">Join</button>
         </form>
-        <p id="hosted-error" class="error-text" role="alert"></p>
+        <div id="hosted-invites"></div>
       </div>
       <div id="hosted-lobby" hidden>
         <h3>Table <span id="lobby-code"></span></h3>
         <ul id="lobby-players"></ul>
         <p class="muted" id="lobby-status">Waiting for players…</p>
+        <button type="button" class="btn ghost" id="btn-invite-friend" hidden>Invite a friend</button>
+        <div id="lobby-friends"></div>
         <button type="button" class="btn primary" id="btn-start-hosted">Start round</button>
         <button type="button" class="btn ghost" id="btn-leave-hosted">Leave</button>
       </div>
+      <p id="hosted-error" class="error-text" role="alert"></p>
       <button type="button" class="btn ghost back-btn" data-back="modes">Back</button>
     </section>
 
@@ -259,6 +266,7 @@
     <section class="screen" id="screen-records" aria-labelledby="records-h">
       <h2 id="records-h">Records</h2>
       <div id="records-body"></div>
+      <div id="records-board"></div>
       <button type="button" class="btn ghost back-btn" data-back="title">Back</button>
     </section>
 

@@ -20,11 +20,12 @@
  * (practice/learn/daily/journey/challenge) run entirely on the client with no
  * /api calls (app.js only uses WebSocket for optional hosted play and fetch
  * for local sfx samples, which fall back to synthesized audio on failure).
- * starhermit.txt declares server=server.js for the authoritative host, but
- * solo play needs no backend. Per the sibling-title conventions this test
- * embeds a minimal node:http static server on an ephemeral port. If a solo
- * mode ever starts requiring the backend this can be swapped for spawning
- * server.js; today it is not needed.
+ * starhermit.txt no longer declares server=server.js: hosted tables on the
+ * platform run as host-routed realtime rooms, and server.js is only the local
+ * dev host (npm start). Solo play needs no backend. Per the sibling-title
+ * conventions this test embeds a minimal node:http static server on an
+ * ephemeral port. If a solo mode ever starts requiring the backend this can
+ * be swapped for spawning server.js; today it is not needed.
  *
  * Run: npm run test:e2e  (or: node tests/e2e.mjs)
  */
