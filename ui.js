@@ -300,6 +300,9 @@ import * as THREE from "./three.module.min.js";
     });
 
     window.addEventListener("resize", resize);
+    // the table's box is sized by the surrounding chrome (HUD, hand, lesson);
+    // follow its size directly rather than only window resizes
+    if (typeof ResizeObserver === "function") new ResizeObserver(function () { resize(); }).observe(container);
     resize();
     applyQuality();
     requestAnimationFrame(tick);

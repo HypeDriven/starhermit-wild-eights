@@ -39,7 +39,7 @@ Round score derives from opponents' remaining cards. Results show a component br
 
 ### Modes
 
-- **Learn:** interactive lessons introduce one rule at a time and require the player to perform the action.
+- **Learn:** interactive lessons introduce one rule at a time and require the player to perform the action. The current lesson is shown above the board, and the table's height is budgeted from what the viewport leaves after HUD, lesson and hand so a round never needs scrolling.
 - **Journey:** authored progression with gradually combined mechanics and periodic mastery stages.
 - **Daily:** one shared seed and ruleset per UTC day, synchronized to platform time.
 - **Practice:** selectable difficulty, restart, undo where rules permit, and no effect on competitive rating.
@@ -75,7 +75,7 @@ The Three.js canvas fills the game region but is never the only UI. Menus, text,
 - **Wide desktop (≥1024 CSS px):** centered playfield, objective/progression rail on the left, contextual actions and social/status rail on the right. Maximum line length is 70 characters.
 - **Compact desktop/tablet:** playfield remains central; secondary rails collapse into drawers. Pointer hover may preview but never be required.
 - **Portrait mobile:** top safe-area status bar, square or perspective-fit playfield, bottom thumb-zone action tray, and sheet-based secondary panels. Never place critical controls under browser chrome or display cutouts.
-- **Landscape mobile:** reserve a narrow status rail; preserve at least 44×44 CSS-pixel targets and 8-pixel separation.
+- **Landscape mobile:** status rail | table | hand column with the lesson across the top and the page header hidden mid-round; preserve at least 44×44 CSS-pixel targets and 8-pixel separation.
 - React to resize, orientation, device-pixel-ratio, safe-area insets, virtual keyboard, and visibility changes without losing input or restarting the round.
 
 ### Screens and overlays
@@ -85,7 +85,7 @@ The Three.js canvas fills the game region but is never the only UI. Menus, text,
 - **Play HUD:** objective, progress, current actor/state, pause, and only context-relevant actions.
 - **Pause/settings:** resume first; audio, graphics, controls, accessibility, help, and leave are clearly separated.
 - **Results:** outcome headline, score breakdown, progress, achievements, comparison, replay/retry, and next recommended action.
-- **Help:** visual rule cards generated from current control mappings and representative legal states.
+- **Help:** visual rule cards generated from current control mappings and representative legal states. Screens open at their heading (focus without scrolling).
 - Lobby, roster, readiness, invitation, reconnect, result, and report states are first-class screens.
 
 ### Input

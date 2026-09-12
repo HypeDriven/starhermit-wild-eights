@@ -126,8 +126,12 @@
     lastFocus = document.activeElement;
     el.classList.add("active");
     currentScreen = name;
+    // focus without scrolling so a long screen (Help) opens at its heading,
+    // then make sure the top of the screen is what the player sees
     var first = el.querySelector("button, input, select, [tabindex]");
-    if (first) first.focus();
+    if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+    if (name !== "game" && !el.classList.contains("overlay")) window.scrollTo(0, 0);
+    if (el.classList.contains("overlay")) el.scrollTop = 0;
     document.body.classList.toggle("in-game", name === "game");
   }
   function back() {
@@ -627,10 +631,42 @@
     enterGame();
   }
 
+  // Height budget for the 3D table: whatever the viewport leaves after the
+  // page header, HUD, lesson panel and hand zone (portrait/desktop stack) —
+  // or after header + lesson only (landscape columns). Keeps the whole round
+  // (board, current instruction, Draw) on one screen without scrolling.
+  var tableBudgetRaf = 0;
+  function updateTableBudget() {
+    cancelAnimationFrame(tableBudgetRaf);
+    tableBudgetRaf = requestAnimationFrame(function () {
+      var game = $("screen-game");
+      if (!game || !game.classList.contains("active")) return;
+      var landscape = window.matchMedia("(max-height: 500px) and (orientation: landscape)").matches;
+      var top = game.getBoundingClientRect().top;
+      var h = function (id) { var e = $(id); return e && !e.hidden ? e.getBoundingClientRect().height : 0; };
+      var tut = h("tutorial-panel");
+      var used = tut + 10;
+      if (!landscape) {
+        var hud = game.querySelector(".hud-top"), hand = game.querySelector(".hand-zone");
+        used += (hud ? hud.getBoundingClientRect().height : 0) + (hand ? hand.getBoundingClientRect().height : 0) + 30;
+      }
+      var avail = Math.max(160, window.innerHeight - top - used - 12);
+      document.documentElement.style.setProperty("--table-max", Math.round(avail) + "px");
+    });
+  }
+  window.addEventListener("resize", updateTableBudget);
+  if (typeof ResizeObserver === "function") {
+    var budgetRo = new ResizeObserver(updateTableBudget);
+    ["tutorial-panel", "hand-list", "screen-game"].forEach(function (id) { var e = $(id); if (e) budgetRo.observe(e); });
+  }
+  var tutMo = $("tutorial-panel");
+  if (tutMo) new MutationObserver(updateTableBudget).observe(tutMo, { attributes: true, attributeFilter: ["hidden"], childList: true, subtree: true });
+
   function enterGame() {
     selectedCardId = null;
     screenStack = [];
     show("game", false);
+    updateTableBudget();
     if (UI.isReady()) UI.resize();
     runAI();
     rerender();
