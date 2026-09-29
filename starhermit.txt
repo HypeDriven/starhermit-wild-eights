@@ -1,4 +1,5 @@
 name=Wild Eights
+description=Match cards by suit or rank, use wild eights to change suit, and be the first to empty your hand.
 launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 cover=cover.jpg
