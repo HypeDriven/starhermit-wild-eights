@@ -8,7 +8,10 @@
 <link rel="apple-touch-icon" href="./icon.png">
 <title>Wild Eights</title>
 <link rel="stylesheet" href="./styles.css">
+<script type="importmap">{ "imports": { "three": "./three.module.min.js", "three/addons/": "./vendor/three/addons/" } }</script>
 <script src="./game.js"></script>
+<script src="./gfx.js"></script>
+<script src="./graphics-panel.js"></script>
 <script src="./content.js"></script>
 <script src="./audio.js"></script>
 <script src="./platform.js"></script>
@@ -216,16 +219,29 @@
           <label>Effects <input type="range" id="vol-effects" min="0" max="100" value="80"></label>
           <label>Ambience <input type="range" id="vol-ambience" min="0" max="100" value="40"></label>
         </fieldset>
-        <fieldset>
-          <legend>Graphics</legend>
-          <label>Quality
-            <select id="opt-quality">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high" selected>High</option>
-            </select>
-          </label>
-          <label>Theme <select id="opt-theme"></select></label>
+        <fieldset id="gfx-fieldset" class="gfx-fieldset">
+          <legend id="gfx-legend">Graphics</legend>
+          <div id="gfx-controls" class="gfx-grid">
+            <label for="opt-quality"><span id="gfx-quality-label">Quality</span>
+              <select id="opt-quality" data-gfx="preset">
+                <option value="auto">Auto</option>
+                <option value="low">Low</option>
+                <option value="balanced">Balanced</option>
+                <option value="high">High</option>
+                <option value="ultra">Ultra</option>
+              </select>
+            </label>
+            <label for="opt-gfx-scale"><span id="gfx-scale-label">Render scale</span>
+              <span class="gfx-range"><input type="range" id="opt-gfx-scale" data-gfx="render_scale" min="50" max="200" step="10" value="100"><output id="opt-gfx-scale-out" for="opt-gfx-scale">100%</output></span>
+            </label>
+            <div id="gfx-toggles" class="gfx-toggles">
+              <label><input type="checkbox" id="opt-gfx-adaptive" data-gfx="adaptive" checked> <span id="gfx-adaptive-label">Adaptive resolution</span></label>
+              <label><input type="checkbox" id="opt-gfx-fps" data-gfx="show_fps"> <span id="gfx-fps-label">Show frame rate</span></label>
+            </div>
+            <label for="opt-theme">Theme <select id="opt-theme"></select></label>
+          </div>
+          <p id="gfx-summary" class="muted gfx-summary" aria-live="polite"></p>
+          <p id="gfx-post-note" class="gfx-note" role="status" hidden></p>
         </fieldset>
         <fieldset>
           <legend>Accessibility</legend>

@@ -123,6 +123,7 @@ async function tapOrClickLegal(page, useTap) {
 async function tapOrClick(page, selector, useTap) {
   const loc = page.locator(selector);
   if (useTap) {
+    await loc.first().scrollIntoViewIfNeeded();
     const bb = await loc.first().boundingBox();
     if (!bb || bb.width < 1 || bb.height < 1) throw new Error(`tap target too small: ${selector}`);
     await page.touchscreen.tap(bb.x + bb.width / 2, bb.y + bb.height / 2);
@@ -236,7 +237,7 @@ async function runPass(browser, name, ctxOpts, { full }) {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() !== 'error' || browserNoise.test(m.text())) return;
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
     const url = m.location()?.url || '';
     if (/Failed to load resource/.test(m.text()) && /\/api\/|\/favicon/.test(url)) return;
     errors.push(`console: ${m.text()}`);
@@ -326,17 +327,121 @@ async function runPass(browser, name, ctxOpts, { full }) {
   console.log(`ok - ${name}: no page errors`);
 }
 
+// ---------- graphics settings pass ----------
+// Through the visible Settings screen: switch the quality preset (Low, then
+// High), override one effect, confirm the renderer applied it (data-gfx-preset
+// on <body>/<canvas>, the cost summary) and that it survives a reload; then
+// play a moment on Ultra and Low with zero console errors or warnings.
+async function runGraphicsPass(browser, name, ctxOpts) {
+  const errors = [];
+  const context = await browser.newContext(ctxOpts);
+  const page = await context.newPage();
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
+    errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  const useTap = !!ctxOpts.hasTouch;
+  try {
+    await context.addInitScript(() => {
+      try {
+        if (!localStorage.getItem('wild-eights-save-v1')) {
+          localStorage.setItem('wild-eights-save-v1', JSON.stringify({ version: 1, settings: { tutorialDone: true, muted: true } }));
+        }
+      } catch (e) { /* private mode */ }
+    });
+    const preset = () => page.evaluate(() => document.body.getAttribute('data-gfx-preset'));
+    const openSettings = async () => {
+      await page.waitForSelector('#screen-title.active', { timeout: 15000 });
+      await tapOrClick(page, '#btn-settings', useTap);
+      await page.waitForSelector('#screen-settings.active', { timeout: 5000 });
+      await page.locator('#gfx-fieldset').scrollIntoViewIfNeeded();
+    };
+    await page.goto(BASE, { waitUntil: 'load' });
+    await openSettings();
+    // The panel fits the viewport width (no horizontal cut-off).
+    const fit = await page.evaluate(() => {
+      const r = document.getElementById('gfx-fieldset').getBoundingClientRect();
+      return { left: r.left, right: r.right, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth };
+    });
+    if (fit.left < 0 || fit.right > fit.vw + 1 || fit.sw > fit.vw + 1) throw new Error('graphics panel overflows: ' + JSON.stringify(fit));
+    const auto = await page.locator('#opt-quality option[value="auto"]').textContent();
+    if (!/low/i.test(auto)) throw new Error(`headless Auto should detect Low, got "${auto}"`);
+
+    await page.selectOption('#opt-quality', 'low');
+    await page.waitForFunction(() => document.body.getAttribute('data-gfx-preset') === 'low');
+    await page.selectOption('#opt-quality', 'high');
+    await page.waitForFunction(() => document.body.getAttribute('data-gfx-preset') === 'high' &&
+      document.querySelector('#table canvas')?.getAttribute('data-gfx-preset') === 'high');
+    await page.waitForFunction(() => /2048² shadows/.test(document.getElementById('gfx-summary').textContent));
+    const shadowLabel = await page.locator('#opt-gfx-shadows option[value="preset"]').textContent();
+    if (!/Medium/.test(shadowLabel)) throw new Error(`From-preset label wrong: "${shadowLabel}"`);
+    ok(`${name}: graphics preset Low → High applied (${(await page.textContent('#gfx-summary')).trim()})`);
+
+    await page.selectOption('#opt-gfx-shadows', 'off');
+    await page.waitForFunction(() => /no shadows/.test(document.getElementById('gfx-summary').textContent));
+    await tapOrClick(page, '#opt-gfx-fps', useTap);
+    ok(`${name}: shadow override and frame-rate toggle applied`);
+
+    await page.reload({ waitUntil: 'load' });
+    await openSettings();
+    const after = await page.evaluate(() => ({
+      q: document.getElementById('opt-quality').value,
+      sh: document.getElementById('opt-gfx-shadows').value,
+      fps: document.getElementById('opt-gfx-fps').checked,
+      body: document.body.getAttribute('data-gfx-preset'),
+    }));
+    if (after.q !== 'high' || after.sh !== 'off' || !after.fps || after.body !== 'high') {
+      throw new Error('graphics settings did not survive reload: ' + JSON.stringify(after));
+    }
+    // Picking a preset clears overrides.
+    await page.selectOption('#opt-quality', 'ultra');
+    await page.waitForFunction(() => document.body.getAttribute('data-gfx-preset') === 'ultra' &&
+      document.getElementById('opt-gfx-shadows').value === 'preset');
+    ok(`${name}: graphics settings survive reload; choosing Ultra clears overrides`);
+
+    // Play briefly on Ultra, then Low (pause → Settings), watching the console.
+    await tapOrClick(page, '.back-btn[data-back="title"] >> visible=true', useTap);
+    await page.waitForSelector('#screen-title.active');
+    await tapOrClick(page, '#btn-play', useTap);
+    await page.waitForSelector('#screen-modes.active');
+    await tapOrClick(page, '.mode-card[data-mode="practice"]', useTap);
+    await page.waitForSelector('#screen-setup.active');
+    await tapOrClick(page, '#setup-form button[type="submit"]', useTap);
+    await page.waitForSelector('#hand-list .card-btn', { timeout: 15000 });
+    await page.waitForTimeout(2500);
+    if (!(await page.isVisible('#fps-meter'))) throw new Error('frame-rate readout not shown');
+    await page.screenshot({ path: SHOT('gfx-ultra', name) });
+    await tapOrClick(page, '#btn-pause', useTap);
+    await tapOrClick(page, '#btn-pause-settings', useTap);
+    await page.waitForSelector('#screen-settings.active');
+    await page.selectOption('#opt-quality', 'low');
+    await tapOrClick(page, '.back-btn[data-back="title"] >> visible=true', useTap); // back to pause
+    await tapOrClick(page, '#btn-resume', useTap);
+    await page.waitForSelector('#screen-game.active');
+    await page.waitForTimeout(1200);
+    if ((await preset()) !== 'low') throw new Error('Low not applied in game');
+    ok(`${name}: played on Ultra and Low with the live renderer`);
+  } finally {
+    await context.close();
+  }
+  if (errors.length) throw new Error(`${name} graphics pass had console output:\n  ${errors.join('\n  ')}`);
+  console.log(`ok - ${name}: graphics pass has no console errors or warnings`);
+}
+
 // ---------- main ----------
 let browser = null;
 try {
   browser = await chromium.launch({
     executablePath: '/usr/bin/google-chrome',
-    args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--mute-audio'],
+    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--mute-audio'],
   });
   console.log(`serving ${ROOT} at ${BASE}`);
   await runPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } }, { full: true });
   await runPass(browser, 'mobile',
     { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, { full: false });
+  await runGraphicsPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } });
+  await runGraphicsPass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   console.log('\nE2E PASS — wild-eights, desktop + mobile, no page errors');
 } catch (e) {
   failures++;

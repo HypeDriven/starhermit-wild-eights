@@ -323,3 +323,20 @@ body.big-text .card-btn { font-size: 22px; min-width: 60px; }
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: none; }
 }
+
+/* --- graphics settings ------------------------------------------------------------------------------- */
+.settings-grid .gfx-fieldset { grid-column: 1 / -1; min-width: 0; }
+.gfx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); column-gap: 24px; row-gap: 6px; }
+.gfx-grid select { max-width: 60%; min-height: 36px; }
+.gfx-range { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; white-space: nowrap; }
+.settings-grid .gfx-range input[type="range"] { max-width: 140px; min-width: 80px; }
+.gfx-range output { min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+.gfx-toggles { display: flex; flex-direction: column; gap: 6px; }
+.settings-grid .gfx-toggles label { justify-content: flex-start; }
+.gfx-summary { margin: 4px 0 0; font-size: 0.9em; overflow-wrap: anywhere; }
+.gfx-note { margin: 0; color: var(--accent-strong); font-size: 0.9em; }
+#fps-meter {
+  position: fixed; left: max(8px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 50; pointer-events: none; padding: 2px 8px; border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55); color: var(--legal); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
+}

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Wild Eights \u2014 railway-compartment card game (browser + authoritative host)",
   "scripts": {
-    "test": "node tests.js",
+    "test": "node tests.js && node --test tests/gfx.test.js",
     "start": "node server.js",
     "test:e2e": "node tests/e2e.mjs"
   },

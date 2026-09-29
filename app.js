@@ -23,7 +23,7 @@
       version: 1,
       settings: {
         volMusic: 50, volEffects: 80, volAmbience: 40, muted: false,
-        quality: "high", theme: "compartment",
+        gfx: {}, theme: "compartment",
         reducedMotion: false, highContrast: false, cvdPalette: false,
         bigText: false, leftHanded: false, tutorialDone: false
       },
@@ -161,7 +161,7 @@
     $("btn-sound").title = s.muted ? "Unmute all audio" : "Mute all audio";
     if (UI.isReady()) {
       UI.setReducedMotion(s.reducedMotion);
-      UI.setQuality(s.quality);
+      UI.setGraphics(s.gfx || {});
       UI.setSuitPalette(s.cvdPalette ? "cvd" : "standard");
       var theme = C.THEMES.filter(function (t) { return t.id === s.theme; })[0] || C.THEMES[0];
       UI.setTheme(theme);
@@ -1703,7 +1703,6 @@
     $("vol-music").addEventListener("input", function (e) { s.volMusic = +e.target.value; persist(); applySettings(); });
     $("vol-effects").addEventListener("input", function (e) { s.volEffects = +e.target.value; persist(); applySettings(); });
     $("vol-ambience").addEventListener("input", function (e) { s.volAmbience = +e.target.value; persist(); applySettings(); });
-    $("opt-quality").addEventListener("change", function (e) { s.quality = e.target.value; persist(); applySettings(); });
     $("opt-theme").addEventListener("change", function (e) { s.theme = e.target.value; persist(); applySettings(); });
     $("opt-motion").addEventListener("change", function (e) { s.reducedMotion = e.target.checked; persist(); applySettings(); });
     $("opt-contrast").addEventListener("change", function (e) { s.highContrast = e.target.checked; persist(); applySettings(); });
@@ -1748,13 +1747,25 @@
     $("vol-music").value = s.volMusic;
     $("vol-effects").value = s.volEffects;
     $("vol-ambience").value = s.volAmbience;
-    $("opt-quality").value = s.quality;
+    if (window.WEGraphicsPanel) window.WEGraphicsPanel.refresh();
     $("opt-theme").value = s.theme;
     $("opt-motion").checked = s.reducedMotion;
     $("opt-contrast").checked = s.highContrast;
     $("opt-cvd").checked = s.cvdPalette;
     $("opt-bigtext").checked = s.bigText;
     $("opt-lefthand").checked = s.leftHanded;
+  }
+
+  // Graphics section of Settings: quality preset, per-effect overrides, render
+  // scale, adaptive resolution and frame-rate readout (see gfx.js, ui.js).
+  // Stored in the save (settings.gfx), so it follows the cloud mirror too.
+  function mountGraphicsPanel() {
+    if (!window.WEGraphicsPanel) return;
+    window.WEGraphicsPanel.mount({
+      get: function () { return save.settings.gfx || {}; },
+      set: function (g) { save.settings.gfx = g; persist(); if (UI.isReady()) { UI.setGraphics(g); rerender(); } },
+      info: function () { return UI.isReady() ? UI.graphicsInfo() : null; }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -1766,12 +1777,13 @@
     if (!onStarhermitHost) syncTime();
     var theme = C.THEMES.filter(function (t) { return t.id === save.settings.theme; })[0] || C.THEMES[0];
     try {
-      UI.init($("table"), { theme: theme, suitPalette: save.settings.cvdPalette ? "cvd" : "standard" });
+      UI.init($("table"), { theme: theme, suitPalette: save.settings.cvdPalette ? "cvd" : "standard", graphics: save.settings.gfx || {} });
       UI.onCardClick(onCardChosen);
     } catch (e) {
       $("webgl-fallback").hidden = false;
       console.warn("WebGL unavailable:", e);
     }
+    mountGraphicsPanel();
     applySettings();
     syncSettingsForm();
     updateTitleProgress();
