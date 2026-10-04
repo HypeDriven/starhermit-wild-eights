@@ -9,6 +9,8 @@
 <title>Wild Eights</title>
 <link rel="stylesheet" href="./styles.css">
 <script type="importmap">{ "imports": { "three": "./three.module.min.js", "three/addons/": "./vendor/three/addons/" } }</script>
+<script src="./starhermit-sdk.js"></script>
+<script>window.StarHermit && StarHermit.init();</script>
 <script src="./game.js"></script>
 <script src="./gfx.js"></script>
 <script src="./graphics-panel.js"></script>
@@ -51,6 +53,10 @@
         <button type="button" class="btn ghost" id="btn-settings">Settings</button>
         <button type="button" class="btn ghost" id="btn-help">How to Play</button>
         <button type="button" class="btn ghost" id="btn-records">Records</button>
+      </div>
+      <div class="title-row">
+        <button type="button" class="btn ghost" id="btn-signin" hidden>Sign in with StarHermit</button>
+        <button type="button" class="btn ghost" id="btn-invite" hidden>Invite a friend</button>
       </div>
       <p id="title-progress" class="muted"></p>
     </section>
@@ -270,8 +276,8 @@
         <article><h3>Drawing</h3><p>If you can't play, draw from the stock — up to 3 cards, then your turn passes.</p></article>
         <article><h3>Controls</h3>
           <ul>
-            <li><kbd>←</kbd>/<kbd>→</kbd> choose a card, <kbd>Enter</kbd> play it</li>
-            <li><kbd>D</kbd> draw · <kbd>H</kbd> hint · <kbd>U</kbd> undo (practice) · <kbd>Esc</kbd> pause</li>
+            <li id="help-keys-play"><kbd>←</kbd>/<kbd>→</kbd> choose a card, <kbd>Enter</kbd> play it</li>
+            <li id="help-keys-actions"><kbd>D</kbd> draw · <kbd>H</kbd> hint · <kbd>U</kbd> undo (practice) · <kbd>Esc</kbd> pause</li>
             <li>Tap a highlighted card to play it; tap Draw to take cards.</li>
           </ul>
         </article>

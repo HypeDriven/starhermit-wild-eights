@@ -1,305 +1,183 @@
-// Wild Eights — StarHermit platform adapter: launch token, account profile,
-// cloud save, read-only leaderboards. Loaded before app.js; exposes
-// window.WEPlatform. Everything here is best-effort: when no launch token was
-// read the module is inert and offline/local play never touches the network.
+// Wild Eights — StarHermit platform adapter over the canonical SDK
+// (starhermit-sdk.js, window.StarHermit, initialised in index.html before
+// this script). Exposes window.WEPlatform with the shape app.js expects:
+// identity, cloud save, settings KV, control bindings, invite link, read-only
+// leaderboard, and an authenticated `api()` used by the realtime-room tables.
+// Without a launch token the module is inert and never touches the network.
 (function (root) {
   "use strict";
 
-  var token = null, sub = null, gameKey = null, sessionId = null;
-  var hosted = false; // true iff a launch token was read from the URL
-  var profileCache = {};
-  var statusHandler = null;
-
-  // ---------------------------------------------------------------------------
-  // Launch token: fragment #game_token=<jwt> (&session_id=<guid>), read once
-  // and stripped. Query-param fallbacks exist for local dev only.
-  function decodeJwt(jwt) {
-    var parts = String(jwt || "").split(".");
-    if (parts.length < 2) return null;
-    try {
-      var b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-      while (b64.length % 4) b64 += "=";
-      var json = (typeof atob !== "undefined")
-        ? atob(b64)
-        : Buffer.from(b64, "base64").toString("binary");
-      return JSON.parse(decodeURIComponent(escape(json)));
-    } catch (e) { return null; }
-  }
-
-  function readToken() {
-    if (typeof location === "undefined") return;
-    var read = null;
-    if (location.hash && location.hash.indexOf("game_token=") >= 0) {
-      var rest = [];
-      location.hash.replace(/^#/, "").split("&").forEach(function (p) {
-        var kv = p.split("=");
-        var key = decodeURIComponent(kv[0] || "");
-        var val = decodeURIComponent(kv.slice(1).join("=") || "");
-        if (key === "game_token") read = val;
-        else if (key === "session_id") sessionId = val;
-        else rest.push(p);
-      });
-      try {
-        history.replaceState(null, "", location.pathname + location.search +
-          (rest.length ? "#" + rest.join("&") : ""));
-      } catch (e) { /* hash stays: token is short-lived anyway */ }
+  // Strings for the StarHermit buttons and toasts (all nine locales).
+  var EN = {
+    signIn: "Sign in with StarHermit",
+    invite: "Invite a friend",
+    inviteCopied: "Invite link copied to the clipboard.",
+    inviteFailed: "Could not copy. Invite link: {link}",
+    signedOut: "Signed out of StarHermit — playing locally."
+  };
+  var STRINGS = {
+    "en-US": EN,
+    "en-GB": EN,
+    "es-419": {
+      signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
+      inviteCopied: "Enlace de invitación copiado al portapapeles.",
+      inviteFailed: "No se pudo copiar. Enlace de invitación: {link}",
+      signedOut: "Se cerró la sesión de StarHermit: juegas en modo local."
+    },
+    "es-ES": {
+      signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
+      inviteCopied: "Enlace de invitación copiado al portapapeles.",
+      inviteFailed: "No se ha podido copiar. Enlace de invitación: {link}",
+      signedOut: "Se ha cerrado la sesión de StarHermit: juegas en local."
+    },
+    "de-DE": {
+      signIn: "Mit StarHermit anmelden", invite: "Freund einladen",
+      inviteCopied: "Einladungslink in die Zwischenablage kopiert.",
+      inviteFailed: "Kopieren fehlgeschlagen. Einladungslink: {link}",
+      signedOut: "Von StarHermit abgemeldet – du spielst lokal weiter."
+    },
+    "fr-FR": {
+      signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
+      inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
+      inviteFailed: "Copie impossible. Lien d’invitation : {link}",
+      signedOut: "Déconnecté de StarHermit — vous jouez en local."
+    },
+    "fr-CA": {
+      signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
+      inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
+      inviteFailed: "Impossible de copier. Lien d’invitation : {link}",
+      signedOut: "Déconnecté de StarHermit — vous jouez en mode local."
+    },
+    "pt-BR": {
+      signIn: "Entrar com StarHermit", invite: "Convidar um amigo",
+      inviteCopied: "Link de convite copiado para a área de transferência.",
+      inviteFailed: "Não foi possível copiar. Link de convite: {link}",
+      signedOut: "Você saiu do StarHermit — jogando localmente."
+    },
+    "it-IT": {
+      signIn: "Accedi con StarHermit", invite: "Invita un amico",
+      inviteCopied: "Link di invito copiato negli appunti.",
+      inviteFailed: "Impossibile copiare. Link di invito: {link}",
+      signedOut: "Disconnesso da StarHermit: giochi in locale."
     }
-    if (!read && /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/i.test(location.hostname)) {
-      var m = /[?&](?:token|launch|launch_token|game_token)=([^&]+)/.exec(location.search);
-      if (m) read = decodeURIComponent(m[1]);
-    }
-    if (!read) return;
-    var payload = decodeJwt(read);
-    if (!payload || !payload.sub) return;
-    token = read;
-    sub = String(payload.sub);
-    gameKey = payload.game_scope || null;
-    hosted = true;
+  };
+  function pickLocale(tag) {
+    var gp = root.WEGraphicsPanel;
+    if (gp && gp.pickLocale) return gp.pickLocale(tag);
+    return STRINGS[tag] ? tag : "en-US";
+  }
+  function translator(locale) {
+    var table = STRINGS[pickLocale(locale)] || EN;
+    return function (key, vars) {
+      var s = table[key] != null ? table[key] : (EN[key] != null ? EN[key] : key);
+      if (vars) for (var k in vars) s = s.replace("{" + k + "}", vars[k]);
+      return s;
+    };
   }
 
-  // ---------------------------------------------------------------------------
-  // Authenticated REST. Authorization: Bearer on every call; same-origin only.
-  function api(path, opts) {
-    opts = opts || {};
-    var h = opts.headers || {};
-    h["Authorization"] = "Bearer " + token;
-    opts.headers = h;
-    return fetch(path, opts);
-  }
-  function apiJson(path, opts) {
-    return api(path, opts)
-      .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
-      .catch(function () { return null; });
-  }
-
-  // Token lifetime is 60 min; re-mint scoped tokens every 45, retry ~60 s.
-  var REFRESH_MS = 45 * 60 * 1000;
-  var refreshTimer = null;
-  function scheduleRefresh() {
-    if (!hosted || !gameKey || typeof setTimeout === "undefined") return;
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(refreshToken, REFRESH_MS);
-  }
-  function refreshToken() {
-    if (!hosted || !gameKey) return;
-    api("/api/v1/games/" + encodeURIComponent(gameKey) + "/launch-token", { method: "POST" })
-      .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
-      .then(function (j) {
-        if (j && j.token) {
-          token = j.token;
-          var p = decodeJwt(token);
-          if (p && p.sub) sub = String(p.sub);
-        }
-        scheduleRefresh();
-      })
-      .catch(function () {
-        clearTimeout(refreshTimer);
-        refreshTimer = setTimeout(refreshToken, 60000);
-      });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Profile. NEVER GET /api/v1/me (403 under game scope); never usernames.
-  function getProfile(userId) {
-    var id = String(userId);
-    if (profileCache[id]) return Promise.resolve(profileCache[id]);
-    return apiJson("/api/v1/users/" + encodeURIComponent(id) + "/profile")
-      .then(function (j) {
-        if (j && (j.id || j.nickname)) profileCache[id] = j;
-        return j || null;
-      });
-  }
-  function displayName(p) {
-    if (p && p.nickname) return p.nickname;
-    if (p && p.id) return "Player " + String(p.id).slice(0, 8);
-    return "Player";
-  }
-  function myNickname() {
-    if (!hosted) return Promise.resolve(null);
-    return getProfile(sub).then(function (p) {
-      return (p && p.nickname) || "Player " + String(sub).slice(0, 8);
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Minimal ZIP writer/reader (stored entries only, no compression).
-  const CRC_TABLE = (() => {
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-      t[n] = c >>> 0;
-    }
-    return t;
-  })();
-  function crc32(bytes) {
-    let c = 0xffffffff;
-    for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
-    return (c ^ 0xffffffff) >>> 0;
-  }
-  function zipStore(name, dataBytes) {
-    const enc = new TextEncoder();
-    const nameB = enc.encode(name);
-    const crc = crc32(dataBytes);
-    const out = [];
-    const u16 = (v) => out.push(v & 0xff, (v >> 8) & 0xff);
-    const u32 = (v) => out.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff);
-    u32(0x04034b50); u16(20); u16(0); u16(0); u16(0); u16(0);
-    u32(crc); u32(dataBytes.length); u32(dataBytes.length);
-    u16(nameB.length); u16(0);
-    const local = out.length;
-    const head = new Uint8Array(out);
-    const cd = [];
-    const c16 = (v) => cd.push(v & 0xff, (v >> 8) & 0xff);
-    const c32 = (v) => cd.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff);
-    c32(0x02014b50); c16(20); c16(20); c16(0); c16(0); c16(0); c16(0);
-    c32(crc); c32(dataBytes.length); c32(dataBytes.length);
-    c16(nameB.length); c16(0); c16(0); c16(0); c16(0); c32(0); c32(0); // attrs + local-header offset
-    const cdHead = new Uint8Array(cd);
-    const cdOff = head.length + nameB.length + dataBytes.length;
-    const parts = [head, nameB, dataBytes, cdHead, nameB];
-    const eocd = [];
-    const e32 = (v) => eocd.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >>> 24) & 0xff);
-    const e16 = (v) => eocd.push(v & 0xff, (v >> 8) & 0xff);
-    e32(0x06054b50); e16(0); e16(0); e16(1); e16(1);
-    e32(cdHead.length + nameB.length); e32(cdOff); e16(0);
-    parts.push(new Uint8Array(eocd));
-    const total = parts.reduce((n, p) => n + p.length, 0);
-    const buf = new Uint8Array(total);
-    let o = 0;
-    for (const p of parts) { buf.set(p, o); o += p.length; }
-    return buf;
-  }
-  function unzipFirstEntry(zipBytes) {
-    // Stored single-entry reader: scan local headers for compression 0.
-    const dv = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
-    let off = 0;
-    while (off + 30 <= zipBytes.length && dv.getUint32(off, true) === 0x04034b50) {
-      const method = dv.getUint16(off + 8, true);
-      const size = dv.getUint32(off + 18, true);
-      const nameLen = dv.getUint16(off + 26, true);
-      const extraLen = dv.getUint16(off + 28, true);
-      const dataOff = off + 30 + nameLen + extraLen;
-      if (method !== 0) throw new Error('unsupported zip entry');
-      return zipBytes.slice(dataOff, dataOff + size);
-    }
-    throw new Error('bad zip');
-  }
-  function bytesToBase64(bytes) {
-    let s = '';
-    for (let i = 0; i < bytes.length; i += 0x8000)
-      s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    return btoa(s);
-  }
-  function base64ToBytes(b64) {
-    const s = atob(b64);
-    const b = new Uint8Array(s.length);
-    for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
-    return b;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Cloud save: ONE slot keyed by the game slug from game_scope. localStorage
-  // stays the offline cache; the cloud is a mirror (remote wins on conflict).
-  var cloud = (function () {
-    var ready = false;      // first load attempt finished — safe to write
-    var latest = null;      // last doc handed to save()
-    var timer = null;
-    var flushing = false;
+  function create(sh) {
+    var statusHandler = null, authHandler = null;
+    var ready = false; // first cloud load finished — safe to write
+    var active = !!(sh && sh.token);
 
     function setStatus(s) { if (statusHandler) statusHandler(s); }
-    function slot() { return "/api/v1/me/cloud-saves/" + encodeURIComponent(gameKey); }
-    function enabled() { return hosted && !!gameKey && typeof fetch !== "undefined"; }
+    if (sh) {
+      sh.on("saved", function (ok) { if (active) setStatus(ok ? "synced" : "offline"); });
+      sh.on("auth", function (e) {
+        if (e && e.signedIn) return;
+        active = false;
+        setStatus("offline");
+        if (authHandler) authHandler(false);
+      });
+    }
 
-    function load() {
-      if (!enabled()) return Promise.resolve(null);
-      return api(slot())
-        .then(function (r) { return r.status === 200 ? r.arrayBuffer() : null; })
-        .catch(function () { return null; })
-        .then(function (buf) {
-          if (!buf) return null;
-          try {
-            var bytes = unzipFirstEntry(new Uint8Array(buf));
-            return JSON.parse(new TextDecoder().decode(bytes));
-          } catch (e) { return null; }
-        });
+    // Response-like wrapper over StarHermit.api for the realtime-room code:
+    // { ok, status, json() }. A 404 surfaces as ok:false/status 404 when the
+    // caller needs a body (`opts.expectBody`).
+    function api(path, opts) {
+      opts = opts || {};
+      if (!active) return Promise.resolve({ ok: false, status: 401, json: function () { return Promise.resolve(null); } });
+      var body = opts.body;
+      if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { /* keep raw */ } }
+      return sh.api(path, { method: opts.method || "GET", body: body }).then(function (j) {
+        if (j == null && opts.expectBody) return { ok: false, status: 404, json: function () { return Promise.resolve(null); } };
+        return { ok: true, status: j == null ? 204 : 200, json: function () { return Promise.resolve(j); } };
+      }, function (e) {
+        return { ok: false, status: (e && e.status) || 0, json: function () { return Promise.resolve((e && e.body) || null); } };
+      });
     }
-    function push(doc) {
-      if (!enabled() || !ready) return Promise.resolve(false);
-      var body;
-      try {
-        body = JSON.stringify({
-          dataBase64: bytesToBase64(zipStore("save.json", new TextEncoder().encode(JSON.stringify(doc))))
-        });
-      } catch (e) { return Promise.resolve(false); }
-      setStatus("saving");
-      return api(slot(), { method: "PUT", headers: { "Content-Type": "application/json" }, body: body })
-        .then(function (r) { setStatus(r.ok ? "synced" : "offline"); return r.ok; })
-        .catch(function () { setStatus("offline"); return false; });
+
+    // Profile: { id, nickname, displayName } (nickname first; never /api/v1/me).
+    function getProfile(userId) {
+      if (!active) return Promise.resolve(null);
+      return sh.profile(String(userId)).then(function (p) {
+        return p ? { id: p.userId, nickname: p.nickname, displayName: p.displayName } : null;
+      });
     }
-    function save(doc) {
-      if (!enabled() || !ready) return;
-      latest = doc;
-      clearTimeout(timer);
-      timer = setTimeout(function () { push(latest); }, 2000); // ~2 s debounce
+    function displayName(p) {
+      if (p && p.displayName) return p.displayName;
+      if (p && p.nickname) return p.nickname;
+      if (p && p.id) return "Player " + String(p.id).slice(0, 6);
+      return "Player";
     }
-    function flush() {
-      if (!enabled() || !ready || latest === null) return;
-      clearTimeout(timer);
-      var doc = latest;
-      latest = null;
-      if (!flushing) {
-        flushing = true;
-        push(doc).then(function () { flushing = false; });
-      }
+    function myNickname() {
+      if (!active) return Promise.resolve(null);
+      return sh.profile().then(function (p) { return p ? p.displayName : null; });
     }
-    if (typeof addEventListener === "function" && typeof document !== "undefined") {
-      addEventListener("pagehide", flush);
-      document.addEventListener("visibilitychange", function () { if (document.hidden) flush(); });
-    }
-    return {
-      load: load,
-      save: save,
-      flush: flush,
+
+    // Cloud save: the whole save document in the game:<slug> slot.
+    var cloud = {
+      load: function () { return active ? sh.loadJSON() : Promise.resolve(null); },
+      save: function (doc) {
+        if (!active || !ready) return;
+        setStatus("saving");
+        sh.saveJSON(doc, 2000);
+      },
+      flush: function () { if (active && ready) sh.flushSave(true); },
       markReady: function () { ready = true; }
     };
-  })();
+    if (typeof addEventListener === "function" && typeof document !== "undefined") {
+      addEventListener("pagehide", cloud.flush);
+      document.addEventListener("visibilitychange", function () { if (document.hidden) cloud.flush(); });
+    }
 
-  // ---------------------------------------------------------------------------
-  // Leaderboards: read-only, hosted only. Clients can never submit.
-  function gameInfo() {
-    if (!hosted || !gameKey) return Promise.resolve(null);
-    return apiJson("/api/v1/games/" + encodeURIComponent(gameKey));
+    return {
+      get hosted() { return active; },
+      get sub() { return active ? sh.userId : null; },
+      get gameKey() { return sh ? sh.slug : null; },
+      get sessionId() { return sh ? sh.launchSessionId : null; },
+      authToken: function () { return active ? sh.token : null; },
+      api: api,
+      refresh: function () { /* renewal is the SDK's job */ },
+      myNickname: myNickname,
+      getProfile: getProfile,
+      displayName: displayName,
+      friends: function () { return active ? sh.friends() : Promise.resolve([]); },
+      roomSocketUrl: function (roomId) { return sh.realtime.socketUrl(roomId); },
+      cloud: cloud,
+      gameInfo: function () { return active ? sh.getGame() : Promise.resolve(null); },
+      leaderboard: function (opts) { return active ? sh.leaderboard(null, opts) : Promise.resolve({ items: [], board: null }); },
+      getSettings: function () { return active ? sh.getSettings() : Promise.resolve({}); },
+      patchSettings: function (obj) { if (active) sh.patchSettings(obj); },
+      loadBindings: function (defaults) {
+        if (active) return sh.loadBindings(defaults);
+        var out = {};
+        for (var k in defaults) out[k] = defaults[k].slice();
+        return Promise.resolve(out);
+      },
+      canSignIn: function () { return !!(sh && sh.canSignIn()); },
+      signIn: function () { return !!(sh && sh.signIn()); },
+      inviteLink: function () { return active ? sh.inviteLink() : null; },
+      t: translator(typeof navigator !== "undefined" && (navigator.languages && navigator.languages[0] || navigator.language)),
+      translator: translator,
+      onStatus: function (fn) { statusHandler = fn; },
+      onAuth: function (fn) { authHandler = fn; }
+    };
   }
-  function boardEntries(leaderboardId, opts) {
-    opts = opts || {};
-    if (!hosted) return Promise.resolve(null);
-    var q = "?pageSize=" + (opts.pageSize || 10);
-    if (opts.friendsOnly) q += "&friendsOnly=1";
-    if (opts.page) q += "&page=" + opts.page;
-    return apiJson("/api/v1/leaderboards/" + encodeURIComponent(leaderboardId) + "/entries" + q);
-  }
 
-  readToken();
-
-  var WEPlatform = {
-    hosted: hosted,
-    sub: sub,
-    gameKey: gameKey,
-    sessionId: sessionId,
-    authToken: function () { return token; },
-    api: api,
-    refresh: scheduleRefresh,
-    myNickname: myNickname,
-    getProfile: getProfile,
-    displayName: displayName,
-    cloud: cloud,
-    gameInfo: gameInfo,
-    boardEntries: boardEntries,
-    onStatus: function (fn) { statusHandler = fn; },
-    // exposed for strict offline validation of the zip writer (tests only)
-    __zip: { zipStore: zipStore, unzipFirstEntry: unzipFirstEntry, bytesToBase64: bytesToBase64, base64ToBytes: base64ToBytes }
-  };
+  var WEPlatform = create(root.StarHermit || null);
+  WEPlatform.create = create;
+  WEPlatform.STRINGS = STRINGS;
   root.WEPlatform = WEPlatform;
   if (typeof module !== "undefined" && module.exports) module.exports = WEPlatform;
 })(typeof window !== "undefined" ? window : globalThis);

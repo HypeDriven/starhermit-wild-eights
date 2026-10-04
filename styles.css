@@ -340,3 +340,12 @@ body.big-text .card-btn { font-size: 22px; min-width: 60px; }
   z-index: 50; pointer-events: none; padding: 2px 8px; border-radius: 6px;
   background: rgba(0, 0, 0, 0.55); color: var(--legal); font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace;
 }
+
+/* StarHermit toast (invite link copied, signed out). */
+.sh-toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%); max-width: min(92vw, 520px); padding: 10px 16px;
+  background: var(--panel-solid); color: var(--ink); border: 1px solid var(--accent);
+  border-radius: 10px; text-align: center; overflow-wrap: anywhere; z-index: 100; pointer-events: none;
+}
+.sh-toast[hidden] { display: none; }

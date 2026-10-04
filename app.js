@@ -47,7 +47,7 @@
   }
   function persist() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* private mode: play session-only */ }
-    if (PL && PL.hosted) PL.cloud.save(save); // debounced mirror; localStorage stays the cache
+    if (PL && PL.hosted) { PL.cloud.save(save); pushSettings(); } // debounced mirror; localStorage stays the cache
   }
 
   // Cloud load is remote-preferred: a remote document wins over the local
@@ -94,24 +94,101 @@
       "Journey " + doneCount + "/" + C.JOURNEY.length + " · streak " + save.streak + " · best score " + save.records.bestScore;
   }
 
-  // Platform-time offset (ms), best effort: when a host serves /api/v1/time we
-  // align daily boundaries to it (round-trip adjusted); offline play falls
-  // back to the local clock, which is exact for a solo daily seed.
+  // Platform-time offset (ms). No time route is reachable (standalone play
+  // makes no network calls; the SDK lists none for launch tokens), so daily
+  // boundaries use the local clock, which is exact for a solo daily seed.
   var timeOffset = 0;
-  function nowMs() { return Date.now() + timeOffset; }
-  function syncTime() {
-    if (!window.fetch) return;
-    var t0 = Date.now();
-    window.fetch("/api/v1/time")
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        if (!j || typeof j.epochMs !== "number") return;
-        var rtt = Date.now() - t0;
-        timeOffset = Math.round(j.epochMs + rtt / 2 - Date.now());
-      })
-      .catch(function () { /* no host: local clock it is */ });
+
+  // ---------------------------------------------------------------------------
+  // StarHermit extras: sign-in / invite buttons, settings KV mirror, toast.
+  var SYNCED_SETTINGS = ["volMusic", "volEffects", "volAmbience", "muted", "gfx", "theme",
+    "reducedMotion", "highContrast", "cvdPalette", "bigText", "leftHanded"];
+  var lastPushedSettings = null, settingsTimer = null;
+  function pushSettings() {
+    if (!PL || !PL.hosted) return;
+    var out = {};
+    SYNCED_SETTINGS.forEach(function (k) { out[k] = save.settings[k]; });
+    var json = JSON.stringify(out);
+    if (json === lastPushedSettings) return;
+    clearTimeout(settingsTimer);
+    settingsTimer = setTimeout(function () { lastPushedSettings = json; PL.patchSettings(out); }, 500);
+  }
+  function adoptRemoteSettings(remote) {
+    if (!remote || typeof remote !== "object") return;
+    var changed = false;
+    SYNCED_SETTINGS.forEach(function (k) {
+      var v = remote[k];
+      if (v === undefined || v === null || typeof v !== typeof save.settings[k]) return;
+      save.settings[k] = v;
+      changed = true;
+    });
+    var out = {};
+    SYNCED_SETTINGS.forEach(function (k) { out[k] = save.settings[k]; });
+    lastPushedSettings = JSON.stringify(out);
+    if (changed) { persist(); applySettings(); syncSettingsForm(); }
+  }
+  function renderPlatformButtons() {
+    if (!PL) return;
+    $("btn-signin").textContent = PL.t("signIn");
+    $("btn-invite").textContent = PL.t("invite");
+    $("btn-signin").hidden = !PL.canSignIn();
+    $("btn-invite").hidden = !(PL.hosted && PL.inviteLink());
+  }
+  function toast(msg) {
+    var t = $("sh-toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "sh-toast";
+      t.className = "sh-toast";
+      t.setAttribute("aria-hidden", "true");
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.hidden = false;
+    announce(msg);
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(function () { t.hidden = true; }, 3500);
+  }
+  function copyInvite() {
+    var link = PL && PL.inviteLink();
+    if (!link) return;
+    var done = function () { toast(PL.t("inviteCopied")); };
+    var fail = function () { toast(PL.t("inviteFailed", { link: link })); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, fail);
+    else fail();
   }
 
+  // Keyboard actions: KeyboardEvent.code values, declared as control.* lines
+  // in starhermit.txt; signed-in players' StarHermit overrides apply.
+  var DEFAULT_BINDINGS = {
+    prev_card: ["ArrowLeft"], next_card: ["ArrowRight"],
+    play_card: ["Enter", "Space", "NumpadEnter"],
+    draw: ["KeyD"], hint: ["KeyH"], undo: ["KeyU"], pause: ["Escape"], camera: ["KeyC"]
+  };
+  var bindings = null, codeAction = {};
+  function setBindings(b) {
+    bindings = b;
+    codeAction = {};
+    Object.keys(b).forEach(function (a) { b[a].forEach(function (c) { codeAction[c] = a; }); });
+    renderKeyHelp();
+  }
+  var KEY_GLYPHS = { ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", Escape: "Esc", NumpadEnter: "Num Enter" };
+  function keyLabel(code) {
+    if (KEY_GLYPHS[code]) return KEY_GLYPHS[code];
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if (/^Digit\d$/.test(code)) return code.slice(5);
+    return code;
+  }
+  function kbd(action) {
+    return (bindings[action] || []).map(function (c) { return "<kbd>" + esc(keyLabel(c)) + "</kbd>"; }).join("/");
+  }
+  function renderKeyHelp() {
+    var a = $("help-keys-play"), b = $("help-keys-actions");
+    if (a) a.innerHTML = kbd("prev_card") + "/" + kbd("next_card") + " choose a card, " + kbd("play_card") + " play it";
+    if (b) b.innerHTML = kbd("draw") + " draw · " + kbd("hint") + " hint · " + kbd("undo") + " undo (practice) · " +
+      kbd("pause") + " pause · " + kbd("camera") + " reframe";
+  }
+  function nowMs() { return Date.now() + timeOffset; }
   // ---------------------------------------------------------------------------
   // Screen router.
   var currentScreen = "title";
@@ -930,12 +1007,12 @@
   }
 
   function roomWsUrl(id) {
-    var proto = location.protocol === "https:" ? "wss://" : "ws://";
-    return proto + location.host + "/ws/v1/realtime?roomId=" + encId(id) +
-      "&access_token=" + encId(PL.authToken());
+    return PL.roomSocketUrl(id);
   }
 
   function roomApiJson(path, opts) {
+    opts = opts || {};
+    opts.expectBody = true;
     return PL.api(path, opts).then(function (r) {
       if (!r.ok) { var e = new Error("http " + r.status); e.status = r.status; throw e; }
       return r.json().catch(function () { return null; });
@@ -1419,8 +1496,7 @@
   }
   function roomShowFriends() {
     if (!room || !room.isHost) return;
-    PL.api("/api/v1/me/friends")
-      .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
+    PL.friends()
       .then(function (j) {
         var box = $("lobby-friends");
         if (!box) return;
@@ -1433,7 +1509,9 @@
           var b = document.createElement("button");
           b.type = "button";
           b.className = "btn small";
-          b.textContent = "Invite " + (f.nickname || "friend");
+          var online = f.online ? " ●" : "";
+          b.textContent = "Invite " + (f.nickname || "friend") + online;
+          if (f.online) b.title = "Online now";
           b.addEventListener("click", function () {
             PL.api("/api/v1/realtime/rooms/" + encId(room.id) + "/invites", {
               method: "POST",
@@ -1447,7 +1525,7 @@
           box.appendChild(b);
           if (!f.nickname) {
             PL.getProfile(String(fid)).then(function (p) {
-              if (p) b.textContent = "Invite " + PL.displayName(p);
+              if (p && !b.disabled) b.textContent = "Invite " + PL.displayName(p) + online;
             });
           }
         });
@@ -1517,7 +1595,8 @@
     var box = $("records-board");
     if (!box) return;
     PL.gameInfo().then(function (g) {
-      if (!g || !box) return;
+      if (!box) return;
+      g = g || {};
       var html = "";
       var me = g.me;
       if (me && typeof me === "object") {
@@ -1528,11 +1607,9 @@
         if (bits.length) html += "<p class=\"muted\">Platform record — " + bits.join(" · ") + "</p>";
       }
       box.innerHTML = html;
-      var lbId = g.leaderboardId;
-      if (!lbId) return;
-      return PL.boardEntries(lbId, { pageSize: 10 }).then(function (j) {
-        if (!box) return;
-        var entries = roomListOf(j, ["entries", "items", "rows"]);
+      return PL.leaderboard({ pageSize: 10 }).then(function (j) {
+        if (!box || !j || !j.board) return;
+        var entries = roomListOf(j, ["items", "entries", "rows"]);
         if (!entries || !entries.length) return;
         var rows = entries.slice(0, 10).map(function (e, i) {
           var uid = e.userId != null ? e.userId : e.id;
@@ -1559,39 +1636,40 @@
   // ---------------------------------------------------------------------------
   // Keyboard controls.
   document.addEventListener("keydown", function (ev) {
+    var action = codeAction[ev.code];
     if (currentScreen === "suit") {
       // The suit declaration is mandatory: dismissing it would strand the round
       // with pendingSuitFor set and no way back to the picker.
-      if (ev.key === "Escape") ev.preventDefault();
+      if (action === "pause") ev.preventDefault();
       return;
     }
     if (currentScreen !== "game" || !session) {
-      if (ev.key === "Escape" && currentScreen !== "title") back();
+      if (action === "pause" && currentScreen !== "title") back();
       return;
     }
     var st = session.state;
     var mySeat = session.hosted ? session.seat : 0;
     var hand = st.hands[mySeat] || [];
     var idx = hand.findIndex(function (c) { return c.id === selectedCardId; });
-    if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") {
+    if (action === "next_card" || action === "prev_card") {
       ev.preventDefault();
       if (!hand.length) return;
-      var dir = ev.key === "ArrowRight" ? 1 : -1;
+      var dir = action === "next_card" ? 1 : -1;
       idx = idx < 0 ? (dir > 0 ? 0 : hand.length - 1) : (idx + dir + hand.length) % hand.length;
       selectedCardId = hand[idx].id;
       A.play("select");
       rerender();
-    } else if (ev.key === "Enter" || ev.key === " ") {
+    } else if (action === "play_card") {
       if (selectedCardId !== null) { ev.preventDefault(); onCardChosen(selectedCardId); }
-    } else if (ev.key === "d" || ev.key === "D") {
+    } else if (action === "draw") {
       drawCard();
-    } else if (ev.key === "h" || ev.key === "H") {
+    } else if (action === "hint") {
       hint();
-    } else if (ev.key === "u" || ev.key === "U") {
+    } else if (action === "undo") {
       undo();
-    } else if (ev.key === "Escape") {
+    } else if (action === "pause") {
       show("pause");
-    } else if (ev.key === "c" || ev.key === "C") {
+    } else if (action === "camera") {
       if (UI.isReady()) UI.resize(); // camera/framing reset
     }
   });
@@ -1606,16 +1684,18 @@
       var p = pads[i];
       if (!p) continue;
       var pressed = function (b) { return p.buttons[b] && p.buttons[b].pressed; };
-      var key = function (b, k) {
+      // Gamepad buttons replay the first key bound to each action.
+      var key = function (b, action) {
         var now = pressed(b);
         if (now && !padPrev[i + ":" + b]) {
-          document.dispatchEvent(new KeyboardEvent("keydown", { key: k }));
+          var code = (bindings && bindings[action] || [])[0];
+          if (code) document.dispatchEvent(new KeyboardEvent("keydown", { code: code }));
         }
         padPrev[i + ":" + b] = now;
       };
-      key(14, "ArrowLeft"); key(15, "ArrowRight");
-      key(0, "Enter"); key(1, "Escape"); key(9, "Escape");
-      key(2, "d"); key(3, "h");
+      key(14, "prev_card"); key(15, "next_card");
+      key(0, "play_card"); key(1, "pause"); key(9, "pause");
+      key(2, "draw"); key(3, "hint");
     }
   }
   requestAnimationFrame(pollGamepad);
@@ -1634,6 +1714,8 @@
     $("btn-help").addEventListener("click", function () { show("help"); });
     $("btn-help-top").addEventListener("click", function () { show("help"); });
     $("btn-records").addEventListener("click", function () { renderRecords(); show("records"); });
+    $("btn-signin").addEventListener("click", function () { PL.signIn(); });
+    $("btn-invite").addEventListener("click", copyInvite);
     $("btn-sound").addEventListener("click", function () {
       save.settings.muted = !save.settings.muted;
       persist(); applySettings();
@@ -1772,9 +1854,7 @@
   // Boot.
   function boot() {
     bind();
-    // /api/v1/time is only served by the game's own local dev host; on the
-    // platform an undocumented probe would just 404, so don't send it there.
-    if (!onStarhermitHost) syncTime();
+    setBindings(DEFAULT_BINDINGS);
     var theme = C.THEMES.filter(function (t) { return t.id === save.settings.theme; })[0] || C.THEMES[0];
     try {
       UI.init($("table"), { theme: theme, suitPalette: save.settings.cvdPalette ? "cvd" : "standard", graphics: save.settings.gfx || {} });
@@ -1787,9 +1867,17 @@
     applySettings();
     syncSettingsForm();
     updateTitleProgress();
+    renderPlatformButtons();
+    if (PL) PL.onAuth(function () {
+      onPlatform = false; // renewal refused: keep playing locally
+      setSyncStatus("offline");
+      renderPlatformButtons();
+      toast(PL.t("signedOut"));
+    });
     if (onPlatform) {
-      PL.refresh(); // 45-min launch-token refresh
       PL.onStatus(setSyncStatus);
+      PL.getSettings().then(adoptRemoteSettings);
+      PL.loadBindings(DEFAULT_BINDINGS).then(setBindings);
       setSyncStatus("saving");
       PL.myNickname().then(function (name) {
         myName = name;
