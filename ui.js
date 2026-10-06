@@ -649,7 +649,8 @@ import * as THREE from "./three.module.min.js";
 
   function resize() {
     if (!renderer || !container) return;
-    var ratio = Math.min(window.devicePixelRatio || 1, q.dprCap) * q.scale * adaptiveScale;
+    // the canvas sits inside the page zoomed by --ui-scale: clientWidth is layout px
+    var ratio = Math.min(window.devicePixelRatio || 1, q.dprCap) * ((window.UIScale && UIScale.value) || 1) * q.scale * adaptiveScale;
     if (ratio !== pixelRatio) { pixelRatio = ratio; renderer.setPixelRatio(ratio); }
     // Hidden table (menus): keep the last real size; the ResizeObserver
     // resizes again when the game screen shows.

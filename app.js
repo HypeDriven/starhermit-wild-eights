@@ -721,13 +721,17 @@
       var landscape = window.matchMedia("(max-height: 500px) and (orientation: landscape)").matches;
       var top = game.getBoundingClientRect().top;
       var h = function (id) { var e = $(id); return e && !e.hidden ? e.getBoundingClientRect().height : 0; };
-      var tut = h("tutorial-panel");
-      var used = tut + 10;
+      // rects and innerHeight are visual px; --table-max (and the px gaps below) are
+      // layout px inside the page zoomed by --ui-scale, so convert before the gaps
+      var zs = (window.UIScale && UIScale.value) || 1;
+      var used = h("tutorial-panel");
+      var gaps = 10;
       if (!landscape) {
         var hud = game.querySelector(".hud-top"), hand = game.querySelector(".hand-zone");
-        used += (hud ? hud.getBoundingClientRect().height : 0) + (hand ? hand.getBoundingClientRect().height : 0) + 30;
+        used += (hud ? hud.getBoundingClientRect().height : 0) + (hand ? hand.getBoundingClientRect().height : 0);
+        gaps += 30;
       }
-      var avail = Math.max(160, window.innerHeight - top - used - 12);
+      var avail = Math.max(160, (window.innerHeight - top - used) / zs - gaps - 12);
       document.documentElement.style.setProperty("--table-max", Math.round(avail) + "px");
     });
   }

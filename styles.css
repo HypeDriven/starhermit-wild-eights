@@ -46,7 +46,7 @@ body {
 #app {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 12px clamp(8px, 3vw, 40px) calc(20px + env(safe-area-inset-bottom));
+  padding: 12px clamp(8px, calc(3vw / var(--ui-scale, 1)), 40px) calc(20px + env(safe-area-inset-bottom));
 }
 
 /* --- top bar -------------------------------------------------------------- */
@@ -54,12 +54,12 @@ body {
   display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
 }
 .topbar h1 {
-  font-size: clamp(22px, 3.5vw, 32px);
+  font-size: clamp(22px, calc(3.5vw / var(--ui-scale, 1)), 32px);
   margin: 4px 0;
   letter-spacing: 0.04em;
   color: var(--accent);
 }
-.tagline { margin: 0; color: var(--muted); font-size: clamp(12px, 1.6vw, 15px); flex: 1; }
+.tagline { margin: 0; color: var(--muted); font-size: clamp(12px, calc(1.6vw / var(--ui-scale, 1)), 15px); flex: 1; }
 .topbar-actions { display: flex; gap: var(--gap); align-items: center; }
 .topbar-actions button { min-height: var(--target); min-width: var(--target); }
 .profile-name, .sync-status {
@@ -72,7 +72,7 @@ body {
 
 /* --- buttons ---------------------------------------------------------------- */
 .btn {
-  font-size: clamp(14px, 1.8vw, 17px);
+  font-size: clamp(14px, calc(1.8vw / var(--ui-scale, 1)), 17px);
   padding: 10px 22px;
   min-height: var(--target);
   border-radius: 999px;
@@ -89,7 +89,7 @@ body {
 .btn.primary:hover { background: var(--accent); }
 .btn.ghost { background: transparent; }
 .btn.small { padding: 6px 14px; min-height: 36px; font-size: 14px; }
-.btn.big { font-size: clamp(18px, 2.6vw, 24px); padding: 16px 56px; }
+.btn.big { font-size: clamp(18px, calc(2.6vw / var(--ui-scale, 1)), 24px); padding: 16px 56px; }
 .btn.danger { border-color: var(--danger); color: var(--danger); }
 
 button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
@@ -98,7 +98,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 }
 
 /* --- screens ----------------------------------------------------------------- */
-.screen { display: none; margin-top: clamp(10px, 2vh, 24px); }
+.screen { display: none; margin-top: clamp(10px, calc(2vh / var(--ui-scale, 1)), 24px); }
 .screen.active { display: block; }
 .screen.overlay {
   position: fixed; inset: 0; z-index: 30;
@@ -107,14 +107,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   place-items: center;
   text-align: center;
 }
-.screen.overlay.active { display: grid; }
-.screen h2 { font-size: clamp(20px, 3vw, 28px); margin: 0 0 14px; max-width: 70ch; }
+.screen.overlay.active { display: grid; align-content: center; gap: 8px; }
+.screen h2 { font-size: clamp(20px, calc(3vw / var(--ui-scale, 1)), 28px); margin: 0 0 14px; max-width: 70ch; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
 .col { display: flex; flex-direction: column; gap: 12px; max-width: 320px; margin: 0 auto; }
 
 /* --- title -------------------------------------------------------------------- */
 #screen-title { text-align: center; }
-.title-hero { font-size: clamp(48px, 9vw, 96px); margin: 12px 0 20px; }
+.title-hero { font-size: clamp(48px, calc(9vw / var(--ui-scale, 1)), 96px); margin: 12px 0 20px; }
 #btn-play { margin-bottom: 18px; }
 .title-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
 
@@ -165,8 +165,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .hud-top {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
 }
-.objective { margin: 0; font-size: clamp(14px, 2vw, 17px); color: var(--accent); }
-.turn { margin: 2px 0 0; font-size: clamp(13px, 1.8vw, 15px); color: var(--muted); }
+.objective { margin: 0; font-size: clamp(14px, calc(2vw / var(--ui-scale, 1)), 17px); color: var(--accent); }
+.turn { margin: 2px 0 0; font-size: clamp(13px, calc(1.8vw / var(--ui-scale, 1)), 15px); color: var(--muted); }
 .hud-actions { display: flex; gap: var(--gap); }
 
 .playfield-wrap { position: relative; }
@@ -174,7 +174,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   width: 100%;
   aspect-ratio: 16 / 10;
   /* --table-max is the height left after HUD, lesson and hand (set in app.js) */
-  max-height: var(--table-max, 62vh);
+  max-height: var(--table-max, calc(62vh / var(--ui-scale, 1)));
   border-radius: 14px;
   overflow: hidden;
   background: #14100c;
@@ -190,7 +190,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
   border-radius: 14px;
   padding: 10px 14px;
 }
-.suit-banner { margin: 0 0 6px; font-size: clamp(13px, 1.8vw, 15px); color: var(--accent); min-height: 1.3em; }
+.suit-banner { margin: 0 0 6px; font-size: clamp(13px, calc(1.8vw / var(--ui-scale, 1)), 15px); color: var(--accent); min-height: 1.3em; }
 .cardlist {
   list-style: none; padding: 0; margin: 0;
   display: flex; flex-wrap: wrap; gap: var(--gap);
@@ -198,7 +198,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 .card-btn {
   min-width: 52px; min-height: var(--target);
   padding: 8px 10px;
-  font-size: clamp(15px, 2.2vw, 19px); font-weight: 600;
+  font-size: clamp(15px, calc(2.2vw / var(--ui-scale, 1)), 19px); font-weight: 600;
   border-radius: 8px;
   border: 2px solid rgba(255, 255, 255, 0.2);
   background: #fdfdf8; color: #222;
@@ -247,7 +247,7 @@ body.left-handed .tray { flex-direction: row-reverse; }
 .suit-btn:hover { border-color: var(--accent-strong); }
 
 /* --- results ----------------------------------------------------------------------------- */
-.headline { font-size: clamp(22px, 3.4vw, 30px); color: var(--accent); margin: 4px 0 14px; }
+.headline { font-size: clamp(22px, calc(3.4vw / var(--ui-scale, 1)), 30px); color: var(--accent); margin: 4px 0 14px; }
 .score-table { border-collapse: collapse; min-width: min(420px, 100%); margin-bottom: 10px; }
 .score-table caption { text-align: left; color: var(--muted); margin-bottom: 6px; }
 .score-table th, .score-table td { padding: 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.15); text-align: left; }
@@ -284,7 +284,7 @@ kbd { background: rgba(255,255,255,0.15); border-radius: 4px; padding: 1px 6px; 
 }
 @media (max-width: 640px) and (orientation: portrait) {
   /* Portrait mobile: status top, square playfield, thumb-zone tray bottom. */
-  #table { aspect-ratio: 1 / 1; max-height: var(--table-max, 46vh); }
+  #table { aspect-ratio: 1 / 1; max-height: var(--table-max, calc(46vh / var(--ui-scale, 1))); }
   .hand-zone { position: sticky; bottom: env(safe-area-inset-bottom); z-index: 5; }
   .card-btn { min-width: 48px; }
   .hud-top { flex-direction: column; }
@@ -302,12 +302,12 @@ kbd { background: rgba(255,255,255,0.15); border-radius: 4px; padding: 1px 6px; 
   .hud-actions { flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .hud-actions .btn { padding: 6px 10px; }
   #screen-game .playfield-wrap { order: 2; flex: 1; min-width: 0; }
-  #screen-game .hand-zone { order: 3; flex: 0 0 230px; max-height: var(--table-max, 60vh); overflow-y: auto; padding: 8px 10px; }
+  #screen-game .hand-zone { order: 3; flex: 0 0 230px; max-height: var(--table-max, calc(60vh / var(--ui-scale, 1))); overflow-y: auto; padding: 8px 10px; }
   /* the page header is the only thing not needed mid-round on a short screen */
   body.in-game .topbar { display: none; }
   #screen-game.active { margin-top: 6px; }
   .cardlist { justify-content: flex-start; }
-  #table { max-height: none; aspect-ratio: auto; height: var(--table-max, 58vh); }
+  #table { max-height: none; aspect-ratio: auto; height: var(--table-max, calc(58vh / var(--ui-scale, 1))); }
 }
 
 /* --- accessibility variants ------------------------------------------------------------------------------- */
@@ -344,8 +344,19 @@ body.big-text .card-btn { font-size: 22px; min-width: 60px; }
 /* StarHermit toast (invite link copied, signed out). */
 .sh-toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%); max-width: min(92vw, 520px); padding: 10px 16px;
+  transform: translateX(-50%); max-width: min(calc(92vw / var(--ui-scale, 1)), 520px); padding: 10px 16px;
   background: var(--panel-solid); color: var(--ink); border: 1px solid var(--accent);
   border-radius: 10px; text-align: center; overflow-wrap: anywhere; z-index: 100; pointer-events: none;
 }
 .sh-toast[hidden] { display: none; }
+
+/* Large screens: ui-scale.js sets --ui-scale (exactly 1 up to 1600x1000). The whole
+   page zooms by it; vw/vh lengths above are divided by it to stay viewport-relative. */
+body { zoom: var(--ui-scale, 1); }
+/* the title menu is centred in the viewport on large screens instead of hugging the top */
+html.ui-scaled #app:has(#screen-title.active) {
+  min-height: calc(100vh / var(--ui-scale, 1));
+  display: flex; flex-direction: column;
+}
+html.ui-scaled #app:has(#screen-title.active) > #screens { flex: 1; display: flex; flex-direction: column; }
+html.ui-scaled #screens > #screen-title.active { margin-block: auto; padding-bottom: 60px; }
