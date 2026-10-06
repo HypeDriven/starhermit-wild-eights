@@ -308,6 +308,11 @@ kbd { background: rgba(255,255,255,0.15); border-radius: 4px; padding: 1px 6px; 
   #screen-game.active { margin-top: 6px; }
   .cardlist { justify-content: flex-start; }
   #table { max-height: none; aspect-ratio: auto; height: var(--table-max, calc(58vh / var(--ui-scale, 1))); }
+  /* title: a smaller card fan and tighter rows keep every menu button above the fold */
+  .title-hero { font-size: 44px; line-height: 1; margin: 0 0 6px; }
+  #btn-play { margin-bottom: 6px; padding-block: 10px; }
+  .title-row { margin: 6px 0; }
+  #title-progress { margin: 4px 0; }
 }
 
 /* --- accessibility variants ------------------------------------------------------------------------------- */

@@ -75,7 +75,7 @@ The Three.js canvas fills the game region but is never the only UI. Menus, text,
 - **Wide desktop (≥1024 CSS px):** centered playfield, objective/progression rail on the left, contextual actions and social/status rail on the right. Maximum line length is 70 characters.
 - **Compact desktop/tablet:** playfield remains central; secondary rails collapse into drawers. Pointer hover may preview but never be required.
 - **Portrait mobile:** top safe-area status bar, square or perspective-fit playfield, bottom thumb-zone action tray, and sheet-based secondary panels. Never place critical controls under browser chrome or display cutouts.
-- **Landscape mobile:** status rail | table | hand column with the lesson across the top and the page header hidden mid-round; preserve at least 44×44 CSS-pixel targets and 8-pixel separation.
+- **Landscape mobile:** status rail | table | hand column with the lesson across the top and the page header hidden mid-round; preserve at least 44×44 CSS-pixel targets and 8-pixel separation. The title screen compacts (smaller card fan, tighter rows) so every menu button fits above the fold.
 - React to resize, orientation, device-pixel-ratio, safe-area insets, virtual keyboard, and visibility changes without losing input or restarting the round.
 - **Large screens (above 1600×1000):** the shared `ui-scale.js` sets `--ui-scale` (`min(w/1600, h/1000)`, capped at 2.5) and the whole page zooms by it (viewport units divided by it); the table renderer multiplies its pixel ratio by the scale so the 3D table stays sharp, the table budget is converted to layout pixels, and the title menu is centred vertically.
 
