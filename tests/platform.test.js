@@ -119,3 +119,94 @@ test("toast strings exist in all nine locales", () => {
     assert.ok(WEPlatform.STRINGS[l] && WEPlatform.STRINGS[l][k], l + ":" + k);
   }
 });
+
+// Reconnect: renew the launch token before reopening the realtime socket.
+function renewServer(results) {
+  const calls = [];
+  const fetch = async (url, init = {}) => {
+    calls.push({ url, method: init.method || "GET" });
+    if (url === `/api/v1/games/${SLUG}/launch-token`) {
+      const r = results.shift();
+      if (r === "renewed") return new Response(JSON.stringify({ token: JWT2 }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(null, { status: r === "relaunch" ? 401 : 503 });
+    }
+    return new Response(null, { status: 404 });
+  };
+  return { fetch, calls };
+}
+const JWT2 = "x." + b64url({ sub: USER, game_scope: SLUG, exp: Math.floor(Date.now() / 1000) + 7200, n: 2 }) + ".y";
+function hostedPlatform(results) {
+  const srv = renewServer(results);
+  const sh = loadSdk().create({ window: fakeWindow("#game_token=" + JWT), fetch: srv.fetch, ...noTimers });
+  sh.init();
+  const timers = [];
+  const P = WEPlatform.create(sh, { setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {} });
+  return { sh, P, srv, timers };
+}
+const tick = () => new Promise((r) => setImmediate(r));
+
+test("reconnect renews first and opens with the new token", async () => {
+  const { P, srv } = hostedPlatform(["renewed"]);
+  const oldUrl = P.roomSocketUrl("r1");
+  let url = null;
+  P.reconnect({ open: () => { url = P.roomSocketUrl("r1"); } });
+  assert.equal(url, null, "nothing opens before renewal resolves");
+  await tick(); await tick(); await tick();
+  assert.equal(srv.calls[0].url, `/api/v1/games/${SLUG}/launch-token`);
+  assert.ok(url, "opened after renewal");
+  assert.notEqual(url, oldUrl);
+  assert.ok(url.includes("access_token=" + encodeURIComponent(JWT2)) || url.includes("access_token=" + JWT2));
+});
+
+test("reconnect 'retry' backs off without reopening, then opens once renewed", async () => {
+  const { P, srv, timers } = hostedPlatform(["retry", "renewed"]);
+  let opened = 0;
+  P.reconnect({ open: () => { opened++; } });
+  await tick(); await tick(); await tick();
+  assert.equal(opened, 0, "old URL is never reopened on retry");
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].ms, 1000);
+  timers[0].fn();
+  await tick(); await tick(); await tick();
+  assert.equal(opened, 1);
+  assert.equal(srv.calls.filter((c) => c.url.endsWith("/launch-token")).length, 2);
+});
+
+test("reconnect 'relaunch' stops and surfaces the session-expired prompt", async () => {
+  const { sh, P, timers } = hostedPlatform(["relaunch"]);
+  let opened = 0, expired = 0, authReason = null;
+  P.onAuth((_v, reason) => { authReason = reason; });
+  P.reconnect({ open: () => { opened++; }, onExpired: () => { expired++; } });
+  await tick(); await tick(); await tick();
+  assert.equal(opened, 0);
+  assert.equal(expired, 1);
+  assert.equal(timers.length, 0, "no further attempts");
+  assert.equal(authReason, "expired");
+  assert.equal(P.hosted, false);
+
+  // The prompt: localized message + "Back to StarHermit" calling relaunch().
+  const els = {};
+  const mk = (tag) => ({
+    tag, children: [], attrs: {}, listeners: {}, hidden: true, textContent: "",
+    setAttribute(k, v) { this.attrs[k] = v; },
+    appendChild(c) { this.children.push(c); if (c.id) els[c.id] = c; },
+    addEventListener(t, fn) { this.listeners[t] = fn; },
+  });
+  const doc = { body: mk("body"), createElement: mk, getElementById: (id) => els[id] || null };
+  let relaunched = 0;
+  sh.relaunch = () => { relaunched++; return true; };
+  const box = WEPlatform.showExpired(P, doc);
+  assert.equal(box.hidden, false);
+  assert.equal(box.attrs.role, "alert");
+  assert.equal(box.children[0].textContent, P.t("sessionExpired"));
+  assert.equal(box.children[1].textContent, P.t("relaunch"));
+  box.children[1].listeners.click();
+  assert.equal(relaunched, 1);
+  assert.equal(WEPlatform.showExpired(P, doc), box, "shown once, not duplicated");
+});
+
+test("session-expired strings exist in all nine locales", () => {
+  for (const l of ["en-US", "en-GB", "es-419", "es-ES", "de-DE", "fr-FR", "fr-CA", "pt-BR", "it-IT"]) {
+    for (const k of ["sessionExpired", "relaunch"]) assert.ok(WEPlatform.STRINGS[l][k], l + ":" + k);
+  }
+});

@@ -13,7 +13,9 @@
     invite: "Invite a friend",
     inviteCopied: "Invite link copied to the clipboard.",
     inviteFailed: "Could not copy. Invite link: {link}",
-    signedOut: "Signed out of StarHermit — playing locally."
+    signedOut: "Signed out of StarHermit — playing locally.",
+    sessionExpired: "Your StarHermit session expired.",
+    relaunch: "Back to StarHermit"
   };
   var STRINGS = {
     "en-US": EN,
@@ -22,43 +24,50 @@
       signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
       inviteCopied: "Enlace de invitación copiado al portapapeles.",
       inviteFailed: "No se pudo copiar. Enlace de invitación: {link}",
-      signedOut: "Se cerró la sesión de StarHermit: juegas en modo local."
+      signedOut: "Se cerró la sesión de StarHermit: juegas en modo local.",
+      sessionExpired: "Tu sesión de StarHermit expiró.", relaunch: "Volver a StarHermit"
     },
     "es-ES": {
       signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
       inviteCopied: "Enlace de invitación copiado al portapapeles.",
       inviteFailed: "No se ha podido copiar. Enlace de invitación: {link}",
-      signedOut: "Se ha cerrado la sesión de StarHermit: juegas en local."
+      signedOut: "Se ha cerrado la sesión de StarHermit: juegas en local.",
+      sessionExpired: "Tu sesión de StarHermit ha caducado.", relaunch: "Volver a StarHermit"
     },
     "de-DE": {
       signIn: "Mit StarHermit anmelden", invite: "Freund einladen",
       inviteCopied: "Einladungslink in die Zwischenablage kopiert.",
       inviteFailed: "Kopieren fehlgeschlagen. Einladungslink: {link}",
-      signedOut: "Von StarHermit abgemeldet – du spielst lokal weiter."
+      signedOut: "Von StarHermit abgemeldet – du spielst lokal weiter.",
+      sessionExpired: "Deine StarHermit-Sitzung ist abgelaufen.", relaunch: "Zurück zu StarHermit"
     },
     "fr-FR": {
       signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
       inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
       inviteFailed: "Copie impossible. Lien d’invitation : {link}",
-      signedOut: "Déconnecté de StarHermit — vous jouez en local."
+      signedOut: "Déconnecté de StarHermit — vous jouez en local.",
+      sessionExpired: "Votre session StarHermit a expiré.", relaunch: "Retour à StarHermit"
     },
     "fr-CA": {
       signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
       inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
       inviteFailed: "Impossible de copier. Lien d’invitation : {link}",
-      signedOut: "Déconnecté de StarHermit — vous jouez en mode local."
+      signedOut: "Déconnecté de StarHermit — vous jouez en mode local.",
+      sessionExpired: "Votre session StarHermit a expiré.", relaunch: "Retour à StarHermit"
     },
     "pt-BR": {
       signIn: "Entrar com StarHermit", invite: "Convidar um amigo",
       inviteCopied: "Link de convite copiado para a área de transferência.",
       inviteFailed: "Não foi possível copiar. Link de convite: {link}",
-      signedOut: "Você saiu do StarHermit — jogando localmente."
+      signedOut: "Você saiu do StarHermit — jogando localmente.",
+      sessionExpired: "Sua sessão do StarHermit expirou.", relaunch: "Voltar ao StarHermit"
     },
     "it-IT": {
       signIn: "Accedi con StarHermit", invite: "Invita un amico",
       inviteCopied: "Link di invito copiato negli appunti.",
       inviteFailed: "Impossibile copiare. Link di invito: {link}",
-      signedOut: "Disconnesso da StarHermit: giochi in locale."
+      signedOut: "Disconnesso da StarHermit: giochi in locale.",
+      sessionExpired: "La tua sessione StarHermit è scaduta.", relaunch: "Torna a StarHermit"
     }
   };
   function pickLocale(tag) {
@@ -75,7 +84,10 @@
     };
   }
 
-  function create(sh) {
+  function create(sh, env) {
+    env = env || {};
+    var setT = env.setTimeout || (typeof setTimeout === "function" ? setTimeout : null);
+    var clearT = env.clearTimeout || (typeof clearTimeout === "function" ? clearTimeout : null);
     var statusHandler = null, authHandler = null;
     var ready = false; // first cloud load finished — safe to write
     var active = !!(sh && sh.token);
@@ -87,7 +99,7 @@
         if (e && e.signedIn) return;
         active = false;
         setStatus("offline");
-        if (authHandler) authHandler(false);
+        if (authHandler) authHandler(false, (e && e.reason) || "signed-out");
       });
     }
 
@@ -141,6 +153,31 @@
       document.addEventListener("visibilitychange", function () { if (document.hidden) cloud.flush(); });
     }
 
+    // Reopen a realtime-room socket. A failed reconnect may be an expired
+    // token (the handshake is refused before the upgrade and the browser only
+    // reports 1006), so the token is renewed first and h.open() builds the
+    // URL from the fresh token. 'retry' backs off (delays) without reopening
+    // the old URL; 'relaunch' stops for good and calls h.onExpired().
+    var RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
+    function reconnect(h) {
+      var attempt = 0, timer = null, stopped = false;
+      var delays = h.delays || RECONNECT_DELAYS;
+      function step() {
+        timer = null;
+        if (stopped) return;
+        var p = sh && sh.renewForReconnect ? sh.renewForReconnect() : Promise.resolve("relaunch");
+        p.then(function (r) {
+          if (stopped) return;
+          if (r === "renewed") { stopped = true; h.open(); return; }
+          if (r !== "retry") { stopped = true; if (h.onExpired) h.onExpired(); return; }
+          if (attempt >= delays.length || !setT) { stopped = true; if (h.onGiveUp) h.onGiveUp(); return; }
+          timer = setT(step, delays[attempt++]);
+        });
+      }
+      step();
+      return { cancel: function () { stopped = true; if (timer && clearT) clearT(timer); timer = null; } };
+    }
+
     return {
       get hosted() { return active; },
       get sub() { return active ? sh.userId : null; },
@@ -153,7 +190,10 @@
       getProfile: getProfile,
       displayName: displayName,
       friends: function () { return active ? sh.friends() : Promise.resolve([]); },
+      // Built at open time from the current (possibly renewed) token.
       roomSocketUrl: function (roomId) { return sh.realtime.socketUrl(roomId); },
+      reconnect: reconnect,
+      relaunch: function () { return !!(sh && sh.relaunch()); },
       cloud: cloud,
       gameInfo: function () { return active ? sh.getGame() : Promise.resolve(null); },
       leaderboard: function (opts) { return active ? sh.leaderboard(null, opts) : Promise.resolve({ items: [], board: null }); },
@@ -175,8 +215,38 @@
     };
   }
 
+  // "Your session expired" banner with a "Back to StarHermit" button; the
+  // click (a user gesture) sends the player to the launcher for a new token.
+  function showExpired(P, doc) {
+    doc = doc || root.document;
+    if (!doc) return null;
+    var box = doc.getElementById("sh-expired");
+    if (!box) {
+      box = doc.createElement("div");
+      box.id = "sh-expired";
+      box.className = "sh-toast sh-expired";
+      box.setAttribute("role", "alert");
+      var msg = doc.createElement("p");
+      msg.className = "sh-expired-msg";
+      var btn = doc.createElement("button");
+      btn.type = "button";
+      btn.className = "btn primary";
+      btn.id = "btn-relaunch";
+      btn.addEventListener("click", function () { P.relaunch(); });
+      box.appendChild(msg);
+      box.appendChild(btn);
+      doc.body.appendChild(box);
+      box.msg = msg; box.btn = btn;
+    }
+    (box.msg || box.querySelector(".sh-expired-msg")).textContent = P.t("sessionExpired");
+    (box.btn || box.querySelector("button")).textContent = P.t("relaunch");
+    box.hidden = false;
+    return box;
+  }
+
   var WEPlatform = create(root.StarHermit || null);
   WEPlatform.create = create;
+  WEPlatform.showExpired = showExpired;
   WEPlatform.STRINGS = STRINGS;
   root.WEPlatform = WEPlatform;
   if (typeof module !== "undefined" && module.exports) module.exports = WEPlatform;

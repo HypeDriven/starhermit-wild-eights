@@ -1449,14 +1449,30 @@
   }
 
   // Reconnect: a returning player re-attaches to their open room.
+  // The launch token is renewed first (PL.reconnect: an expired token fails
+  // the socket handshake as a bare 1006, so the old URL can never recover);
+  // the socket URL is then built from the fresh token. A refused renewal
+  // stops here and shows the "session expired" prompt.
+  var roomReconnecting = null;
   function roomMaybeReconnect() {
-    if (!onPlatform || room) return;
-    roomApiJson("/api/v1/realtime/rooms/mine").then(function (j) {
-      if (!j || room) return;
-      var info = roomJoinInfo(j);
-      if (!info.id) return;
-      roomEnter(info, info.isHost || info.seat === 0);
-    }).catch(function () {});
+    if (!onPlatform || room || roomReconnecting) return;
+    roomReconnecting = PL.reconnect({
+      open: function () {
+        roomReconnecting = null;
+        roomApiJson("/api/v1/realtime/rooms/mine").then(function (j) {
+          if (!j || room) return;
+          var info = roomJoinInfo(j);
+          if (!info.id) return;
+          roomEnter(info, info.isHost || info.seat === 0);
+        }).catch(function () {});
+      },
+      onExpired: function () { roomReconnecting = null; sessionExpired(); },
+      onGiveUp: function () { roomReconnecting = null; }
+    });
+  }
+  function sessionExpired() {
+    if (roomReconnecting) { roomReconnecting.cancel(); roomReconnecting = null; }
+    PL.showExpired(PL);
   }
 
   // Friend invites: host sends them from the lobby; the invite inbox is polled
@@ -1872,11 +1888,12 @@
     syncSettingsForm();
     updateTitleProgress();
     renderPlatformButtons();
-    if (PL) PL.onAuth(function () {
+    if (PL) PL.onAuth(function (_signedIn, reason) {
       onPlatform = false; // renewal refused: keep playing locally
       setSyncStatus("offline");
       renderPlatformButtons();
-      toast(PL.t("signedOut"));
+      if (reason === "expired") sessionExpired(); // offer "Back to StarHermit"
+      else toast(PL.t("signedOut"));
     });
     if (onPlatform) {
       PL.onStatus(setSyncStatus);

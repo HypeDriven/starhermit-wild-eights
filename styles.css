@@ -354,6 +354,13 @@ body.big-text .card-btn { font-size: 22px; min-width: 60px; }
   border-radius: 10px; text-align: center; overflow-wrap: anywhere; z-index: 100; pointer-events: none;
 }
 .sh-toast[hidden] { display: none; }
+/* session expired: a persistent toast with a "Back to StarHermit" button */
+.sh-expired {
+  pointer-events: auto; z-index: 110; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: center; gap: 8px 12px; width: max-content;
+}
+.sh-expired-msg { margin: 0; }
+.sh-expired[hidden] { display: none; }
 
 /* Large screens: ui-scale.js sets --ui-scale (exactly 1 up to 1600x1000). The whole
    page zooms by it; vw/vh lengths above are divided by it to stay viewport-relative. */
