@@ -655,7 +655,26 @@
       nextBtn.hidden = idx >= C.JOURNEY.length;
     } else nextBtn.hidden = true;
 
+    postToLeaderboard(!session.hosted && session.mode !== "learn"
+      ? (won && st.score ? Math.max(0, st.score.total) : 0) : null);
+
     setTimeout(function () { show("results"); }, save.settings.reducedMotion ? 100 : 900);
+  }
+
+  // Signed in only: post a finished solo round (every mode but Learn; the
+  // round's score when you win, 0 otherwise) to the `high-score` board and show
+  // the player's rank on the results screen.
+  function postToLeaderboard(total) {
+    var line = $("results-lb");
+    if (total == null || !PL || !PL.hosted) { line.hidden = true; return; }
+    line.hidden = false;
+    line.textContent = PL.t("lbPosting");
+    var round = session;
+    PL.submitScore(total).then(function (r) {
+      if (session !== round) return;
+      line.textContent = !r.posted ? PL.t("lbNotPosted")
+        : r.rank ? PL.t("lbRank", { rank: r.rank }) : PL.t("lbPosted");
+    });
   }
 
   var pendingAchievements = [];

@@ -209,15 +209,16 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Achievements and leaderboards
 - Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
-- Records shows the caller's platform stats from `StarHermit.getGame()` and the game's read-only platform board (`StarHermit.leaderboard()`, nicknames resolved via profiles) when one exists.
-- Hosted outcomes are authoritative from the table host (validated turn order, hidden hands never leave the host). Achievement unlocks are local and ride the cloud-saved document; clients never submit scores to platform leaderboards (read-only).
+- One platform board, `high-score` (integer, higher is better, 0–10,000). When signed in, every finished solo round except Learn posts the player's round score (the winner's score when you win, 0 otherwise) through `StarHermit.submitScores` (a practice session whose `score-script.js` posts it), and the results screen shows "Leaderboard rank: #N" (or posted / not posted), localized in the nine locales (`platform.js`). Hosted tables and standalone play post nothing.
+- Records shows the caller's platform stats from `StarHermit.getGame()` and the `high-score` board (`StarHermit.leaderboard('high-score')`, nicknames resolved via profiles) when one exists.
+- Hosted outcomes are authoritative from the table host (validated turn order, hidden hands never leave the host). Achievement unlocks are local and ride the cloud-saved document; hosted results are not posted to the leaderboard.
 
 ### Sessions and transport
 - Without a platform game script there are no platform sessions, matchmaking, practice-vs-House or replays; solo modes run against local deterministic AI.
 - On-platform hosted tables use StarHermit realtime rooms: the host client runs the deterministic engine, guests send whitelisted command messages over the room binary channel, out-of-turn/malformed input is rejected by the host, and the host reports the result through the rooms result endpoint. Reconnect renews the launch token first (`StarHermit.renewForReconnect()`: a transient failure backs off 1/2/4/8/15 s without reopening the old URL, a refusal stops and shows the session-expired notice), then calls `GET /rooms/mine` and opens the socket with a URL built from the fresh token; snapshots are the state source of truth. Room REST calls and the `/ws/v1/realtime` socket URL go through the SDK (`StarHermit.api`, `StarHermit.realtime.socketUrl`).
 
 ### Publishing and operations
-- `server.js` is the local development host only (static files + its own `/ws` tables for `npm start`); it is not a platform game script and is not declared in `starhermit.txt`. On-platform hosting is host-routed realtime rooms; no initial design here requires a sandboxed script or container.
+- `server.js` is the local development host only (static files + its own `/ws` tables for `npm start`); it is not a platform game script. `starhermit.txt` declares `server=score-script.js` (canonical copy in the games repo's `tools/score-script.js`), which only range-checks and posts solo scores. On-platform hosting is host-routed realtime rooms; no initial design here requires a sandboxed script or container.
 - Define control defaults, achievement metadata, and versioned settings before release. Publish immutable build assets, verify the launch path, maintain migration tests for saves, and expose no secret configuration to the client.
 - Capture anonymous funnel events only for start, tutorial step, round end, retry, settings change, and error category. Avoid raw text, precise personal data, and cross-title tracking.
 

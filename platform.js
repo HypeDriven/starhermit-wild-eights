@@ -1,8 +1,8 @@
 // Wild Eights — StarHermit platform adapter over the canonical SDK
 // (starhermit-sdk.js, window.StarHermit, initialised in index.html before
 // this script). Exposes window.WEPlatform with the shape app.js expects:
-// identity, cloud save, settings KV, control bindings, invite link, read-only
-// leaderboard, and an authenticated `api()` used by the realtime-room tables.
+// identity, cloud save, settings KV, control bindings, invite link, the
+// `high-score` leaderboard (post + read), and an authenticated `api()` used by the realtime-room tables.
 // Without a launch token the module is inert and never touches the network.
 (function (root) {
   "use strict";
@@ -15,7 +15,9 @@
     inviteFailed: "Could not copy. Invite link: {link}",
     signedOut: "Signed out of StarHermit — playing locally.",
     sessionExpired: "Your StarHermit session expired.",
-    relaunch: "Back to StarHermit"
+    relaunch: "Back to StarHermit",
+    lbPosting: "Posting score to the leaderboard…", lbRank: "Leaderboard rank: #{rank}",
+    lbPosted: "Score posted to the leaderboard.", lbNotPosted: "Score not posted to the leaderboard."
   };
   var STRINGS = {
     "en-US": EN,
@@ -25,49 +27,63 @@
       inviteCopied: "Enlace de invitación copiado al portapapeles.",
       inviteFailed: "No se pudo copiar. Enlace de invitación: {link}",
       signedOut: "Se cerró la sesión de StarHermit: juegas en modo local.",
-      sessionExpired: "Tu sesión de StarHermit expiró.", relaunch: "Volver a StarHermit"
+      sessionExpired: "Tu sesión de StarHermit expiró.", relaunch: "Volver a StarHermit",
+      lbPosting: "Enviando la puntuación a la clasificación…", lbRank: "Puesto en la clasificación: #{rank}",
+      lbPosted: "Puntuación enviada a la clasificación.", lbNotPosted: "No se envió la puntuación a la clasificación."
     },
     "es-ES": {
       signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
       inviteCopied: "Enlace de invitación copiado al portapapeles.",
       inviteFailed: "No se ha podido copiar. Enlace de invitación: {link}",
       signedOut: "Se ha cerrado la sesión de StarHermit: juegas en local.",
-      sessionExpired: "Tu sesión de StarHermit ha caducado.", relaunch: "Volver a StarHermit"
+      sessionExpired: "Tu sesión de StarHermit ha caducado.", relaunch: "Volver a StarHermit",
+      lbPosting: "Enviando la puntuación a la clasificación…", lbRank: "Puesto en la clasificación: #{rank}",
+      lbPosted: "Puntuación enviada a la clasificación.", lbNotPosted: "No se ha enviado la puntuación a la clasificación."
     },
     "de-DE": {
       signIn: "Mit StarHermit anmelden", invite: "Freund einladen",
       inviteCopied: "Einladungslink in die Zwischenablage kopiert.",
       inviteFailed: "Kopieren fehlgeschlagen. Einladungslink: {link}",
       signedOut: "Von StarHermit abgemeldet – du spielst lokal weiter.",
-      sessionExpired: "Deine StarHermit-Sitzung ist abgelaufen.", relaunch: "Zurück zu StarHermit"
+      sessionExpired: "Deine StarHermit-Sitzung ist abgelaufen.", relaunch: "Zurück zu StarHermit",
+      lbPosting: "Punktzahl wird an die Bestenliste gesendet …", lbRank: "Platz in der Bestenliste: #{rank}",
+      lbPosted: "Punktzahl an die Bestenliste gesendet.", lbNotPosted: "Punktzahl nicht an die Bestenliste gesendet."
     },
     "fr-FR": {
       signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
       inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
       inviteFailed: "Copie impossible. Lien d’invitation : {link}",
       signedOut: "Déconnecté de StarHermit — vous jouez en local.",
-      sessionExpired: "Votre session StarHermit a expiré.", relaunch: "Retour à StarHermit"
+      sessionExpired: "Votre session StarHermit a expiré.", relaunch: "Retour à StarHermit",
+      lbPosting: "Envoi du score au classement…", lbRank: "Rang au classement : #{rank}",
+      lbPosted: "Score envoyé au classement.", lbNotPosted: "Score non envoyé au classement."
     },
     "fr-CA": {
       signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
       inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
       inviteFailed: "Impossible de copier. Lien d’invitation : {link}",
       signedOut: "Déconnecté de StarHermit — vous jouez en mode local.",
-      sessionExpired: "Votre session StarHermit a expiré.", relaunch: "Retour à StarHermit"
+      sessionExpired: "Votre session StarHermit a expiré.", relaunch: "Retour à StarHermit",
+      lbPosting: "Envoi du pointage au classement…", lbRank: "Rang au classement : #{rank}",
+      lbPosted: "Pointage envoyé au classement.", lbNotPosted: "Pointage non envoyé au classement."
     },
     "pt-BR": {
       signIn: "Entrar com StarHermit", invite: "Convidar um amigo",
       inviteCopied: "Link de convite copiado para a área de transferência.",
       inviteFailed: "Não foi possível copiar. Link de convite: {link}",
       signedOut: "Você saiu do StarHermit — jogando localmente.",
-      sessionExpired: "Sua sessão do StarHermit expirou.", relaunch: "Voltar ao StarHermit"
+      sessionExpired: "Sua sessão do StarHermit expirou.", relaunch: "Voltar ao StarHermit",
+      lbPosting: "Enviando a pontuação para o ranking…", lbRank: "Posição no ranking: #{rank}",
+      lbPosted: "Pontuação enviada para o ranking.", lbNotPosted: "A pontuação não foi enviada para o ranking."
     },
     "it-IT": {
       signIn: "Accedi con StarHermit", invite: "Invita un amico",
       inviteCopied: "Link di invito copiato negli appunti.",
       inviteFailed: "Impossibile copiare. Link di invito: {link}",
       signedOut: "Disconnesso da StarHermit: giochi in locale.",
-      sessionExpired: "La tua sessione StarHermit è scaduta.", relaunch: "Torna a StarHermit"
+      sessionExpired: "La tua sessione StarHermit è scaduta.", relaunch: "Torna a StarHermit",
+      lbPosting: "Invio del punteggio alla classifica…", lbRank: "Posizione in classifica: #{rank}",
+      lbPosted: "Punteggio inviato alla classifica.", lbNotPosted: "Punteggio non inviato alla classifica."
     }
   };
   function pickLocale(tag) {
@@ -196,7 +212,19 @@
       relaunch: function () { return !!(sh && sh.relaunch()); },
       cloud: cloud,
       gameInfo: function () { return active ? sh.getGame() : Promise.resolve(null); },
-      leaderboard: function (opts) { return active ? sh.leaderboard(null, opts) : Promise.resolve({ items: [], board: null }); },
+      leaderboard: function (opts) { return active ? sh.leaderboard("high-score", opts) : Promise.resolve({ items: [], board: null }); },
+      // Post a finished solo round to the `high-score` board through the game's
+      // score-script.js (StarHermit.submitScores) → { posted, rank }.
+      submitScore: function (total) {
+        if (!active) return Promise.resolve({ posted: false, rank: null });
+        return sh.submitScores({ "high-score": total }).then(function (keys) {
+          if (!keys || keys.indexOf("high-score") < 0) return { posted: false, rank: null };
+          return sh.leaderboard("high-score", { pageSize: 100 }).then(function (r) {
+            var me = (r.items || []).filter(function (i) { return i.userId === sh.userId; })[0];
+            return { posted: true, rank: me ? me.rank : null };
+          }, function () { return { posted: true, rank: null }; });
+        });
+      },
       getSettings: function () { return active ? sh.getSettings() : Promise.resolve({}); },
       patchSettings: function (obj) { if (active) sh.patchSettings(obj); },
       loadBindings: function (defaults) {
