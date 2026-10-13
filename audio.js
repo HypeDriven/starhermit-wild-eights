@@ -41,7 +41,7 @@
         var g = ctx.createGain();
         g.gain.value = muted ? 0 : levels[name];
         g.connect(ctx.destination);
-        buses[name] = g;
+        buses[name] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, name) : g);
       });
     }
     if (ctx.state === "suspended") ctx.resume();
@@ -56,7 +56,7 @@
   }
 
   function note(bus, freq, t, dur, gainVal, type) {
-    var osc = ctx.createOscillator();
+    var osc = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), bus) : ctx.createOscillator());
     var g = ctx.createGain();
     osc.type = type || "sine";
     osc.frequency.value = freq;
@@ -71,7 +71,7 @@
     var buf = ctx.createBuffer(1, len, ctx.sampleRate);
     var d = buf.getChannelData(0);
     for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    var src = ctx.createBufferSource();
+    var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), bus) : ctx.createBufferSource());
     src.buffer = buf;
     var f = ctx.createBiquadFilter();
     f.type = "bandpass"; f.frequency.value = filterFreq || 1800; f.Q.value = 0.8;
@@ -119,7 +119,7 @@
     var d = buf.getChannelData(0);
     var v = 0;
     for (var i = 0; i < len; i++) { v = v * 0.97 + (Math.random() * 2 - 1) * 0.03; d[i] = v * 6; }
-    noiseSrc = ctx.createBufferSource();
+    noiseSrc = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource());
     noiseSrc.buffer = buf; noiseSrc.loop = true;
     var f = ctx.createBiquadFilter();
     f.type = "lowpass"; f.frequency.value = 320;
@@ -168,7 +168,7 @@
     var entry = sampleCache[clip];
     if (!entry) { loadSample(clip); return false; }
     if (entry === "loading" || entry === "failed") return false;
-    var src = ctx.createBufferSource();
+    var src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), name) : ctx.createBufferSource());
     src.buffer = entry;
     src.connect(buses.effects);
     src.start();

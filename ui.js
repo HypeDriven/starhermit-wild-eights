@@ -864,9 +864,9 @@ import * as THREE from "./three.module.min.js";
     var key = currentPostKey(w, h);
     if (key !== postKey) { postKey = key; buildPost(w, h); }
     if (composer) {
-      try { composer.render(dt); return; } catch (err) { postFailed = true; disposeComposer(); postKey = null; }
+      try { (globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(dt)) : composer.render(dt)); return; } catch (err) { postFailed = true; disposeComposer(); postKey = null; }
     }
-    renderer.render(scene, camera);
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
   }
 
   function disposeCards() {
