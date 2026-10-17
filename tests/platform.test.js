@@ -29,16 +29,23 @@ function fakeWindow(hash) {
 }
 function stubServer() {
   const calls = [];
-  const state = { save: null, settings: {} };
+  const state = { save: null, etag: null, version: 0, settings: {} };
   const json = (o) => new Response(JSON.stringify(o), { status: 200, headers: { "content-type": "application/json" } });
   const fetch = async (url, init = {}) => {
     const method = init.method || "GET";
     calls.push({ url, method, auth: init.headers && init.headers.Authorization, body: init.body });
     if (url === `/api/v1/users/${USER}/profile`) return json({ nickname: "Conductor Cy" });
     if (url.startsWith("/api/v1/me/cloud-saves/")) {
+      // Versioned slot: conditional writes (If-Match / If-None-Match) answer 412 on a stale version.
+      if (url.endsWith("/info")) return json(state.save ? { exists: true, etag: state.etag } : { exists: false });
       if (method === "PUT") {
+        const h = init.headers || {};
+        if ((h["If-Match"] && h["If-Match"] !== state.etag) || (h["If-None-Match"] === "*" && state.save)) {
+          return new Response(JSON.stringify({ error: "precondition_failed", etag: state.etag }), { status: 412, headers: { "content-type": "application/json" } });
+        }
         state.save = Buffer.from(JSON.parse(init.body).dataBase64, "base64");
-        return new Response(null, { status: 204 });
+        state.etag = '"v' + ++state.version + '"';
+        return json({ etag: state.etag });
       }
       return state.save ? new Response(state.save) : new Response(null, { status: 404 });
     }
@@ -128,6 +135,7 @@ function renewServer(results) {
     if (url === `/api/v1/games/${SLUG}/launch-token`) {
       const r = results.shift();
       if (r === "renewed") return new Response(JSON.stringify({ token: JWT2 }), { status: 200, headers: { "content-type": "application/json" } });
+      if (r === "terms") return new Response(JSON.stringify({ error: "terms_acceptance_required" }), { status: 403, headers: { "content-type": "application/json" } });
       return new Response(null, { status: r === "relaunch" ? 401 : 503 });
     }
     return new Response(null, { status: 404 });
@@ -209,4 +217,80 @@ test("session-expired strings exist in all nine locales", () => {
   for (const l of ["en-US", "en-GB", "es-419", "es-ES", "de-DE", "fr-FR", "fr-CA", "pt-BR", "it-IT"]) {
     for (const k of ["sessionExpired", "relaunch"]) assert.ok(WEPlatform.STRINGS[l][k], l + ":" + k);
   }
+});
+
+test("reconnect 'terms-required' stops like auth loss and raises onTermsRequired", async () => {
+  const { P, timers } = hostedPlatform(["terms"]);
+  let opened = 0, expired = 0, terms = 0, sdkTerms = 0;
+  P.onTermsRequired(() => { sdkTerms++; });
+  P.reconnect({ open: () => { opened++; }, onExpired: () => { expired++; }, onTermsRequired: () => { terms++; } });
+  await tick(); await tick(); await tick(); await tick();
+  assert.equal(opened, 0);
+  assert.equal(expired, 0);
+  assert.equal(terms, 1);
+  assert.equal(sdkTerms, 1, "the SDK termsrequired event reaches the app");
+  assert.equal(timers.length, 0, "no further attempts");
+});
+
+test("reconnect gives up visibly after the retry budget", async () => {
+  const { P, timers } = hostedPlatform(["retry", "retry"]);
+  let gaveUp = 0, opened = 0;
+  P.reconnect({ open: () => { opened++; }, onGiveUp: () => { gaveUp++; }, delays: [10] });
+  await tick(); await tick(); await tick();
+  assert.equal(timers.length, 1);
+  timers[0].fn();
+  await tick(); await tick(); await tick();
+  assert.equal(opened, 0);
+  assert.equal(gaveUp, 1);
+});
+
+test("whyRefused reports terms-required for a socket refused before it opened", async () => {
+  const { P } = hostedPlatform(["terms"]);
+  assert.equal(await P.whyRefused(), "terms-required");
+});
+
+test("save conflict: a stale write raises onConflict; reload + merge + save lands", async () => {
+  const srv = stubServer();
+  const sh = loadSdk().create({ window: fakeWindow("#game_token=" + JWT), fetch: srv.fetch, ...noTimers });
+  sh.init();
+  const P = WEPlatform.create(sh);
+  assert.equal(await P.cloud.load(), null);
+  P.cloud.markReady();
+  const other = loadSdk().create({ window: fakeWindow("#game_token=" + JWT), fetch: srv.fetch, ...noTimers });
+  other.init();
+  await other.loadJSON();
+  assert.equal(await other.writeSave(JSON.stringify({ journey: { j2: { won: true, bestMoves: 30 } } })), true);
+  let conflicts = 0;
+  P.cloud.onConflict(() => {
+    conflicts++;
+    P.cloud.load().then((remote) => {
+      assert.deepEqual(remote.journey, { j2: { won: true, bestMoves: 30 } });
+      P.cloud.save({ journey: { j1: { won: true }, j2: remote.journey.j2 } });
+      return sh.flushSave();
+    });
+  });
+  P.cloud.save({ journey: { j1: { won: true } } });
+  await sh.flushSave();
+  for (let i = 0; i < 30; i++) await tick();
+  assert.equal(conflicts, 1);
+  const back = await sh.loadJSON();
+  assert.deepEqual(Object.keys(back.journey).sort(), ["j1", "j2"]);
+});
+
+test("terms-required strings exist in all nine locales", () => {
+  for (const l of ["en-US", "en-GB", "es-419", "es-ES", "de-DE", "fr-FR", "fr-CA", "pt-BR", "it-IT"]) {
+    assert.ok(WEPlatform.STRINGS[l].termsRequired, l);
+  }
+});
+
+test("hosted domain without a token offers sign-in (UUID host)", () => {
+  const srv = stubServer();
+  const win = fakeWindow("");
+  win.location.hostname = "0b9d6f2e-3c4a-4e5b-9a7c-1d2e3f405162.starhermit.com";
+  win.location.origin = "https://" + win.location.hostname;
+  const sh = loadSdk().create({ window: win, fetch: srv.fetch, ...noTimers });
+  sh.init();
+  const P = WEPlatform.create(sh);
+  assert.equal(P.canSignIn(), true);
+  assert.equal(srv.calls.length, 0);
 });

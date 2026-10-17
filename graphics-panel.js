@@ -1,6 +1,6 @@
 // Wild Eights — Graphics section of the Settings screen. Builds the controls
-// inside #gfx-fieldset, localizes them (from navigator.language; the rest of
-// the game is English-only) and applies every change immediately through the
+// inside #gfx-fieldset, localizes them (in the game language from i18n.js;
+// setLocale() relabels in place on a language change) and applies every change immediately through the
 // hooks app.js passes to mount(). Exposes window.WEGraphicsPanel (browser)
 // and module.exports (Node: locale tables for the tests).
 (function (root, factory) {
@@ -261,10 +261,16 @@
   /** hooks: { get(): savedGfx, set(savedGfx), info(): UI.graphicsInfo() | null } */
   function mount(h, locale) {
     hooks = h;
-    S = STRINGS[pickLocale(locale || (typeof navigator !== "undefined" && (navigator.languages && navigator.languages[0] || navigator.language)))] || EN;
+    var gameLocale = typeof window !== "undefined" && window.WEI18N ? window.WEI18N.locale() : null;
+    S = STRINGS[pickLocale(locale || gameLocale || (typeof navigator !== "undefined" && (navigator.languages && navigator.languages[0] || navigator.language)))] || EN;
     build();
     refresh();
   }
+  /** Relabel the built controls in another locale (no rebuild, listeners kept). */
+  function setLocale(locale) {
+    S = STRINGS[pickLocale(locale)] || EN;
+    refresh();
+  }
 
-  return { STRINGS: STRINGS, LOCALES: LOCALES, pickLocale: pickLocale, mount: mount, refresh: refresh };
+  return { STRINGS: STRINGS, LOCALES: LOCALES, pickLocale: pickLocale, mount: mount, refresh: refresh, setLocale: setLocale };
 });

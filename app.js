@@ -10,6 +10,8 @@
   var A = window.WEAudio;
   var UI = window.WEUI;
   var PL = window.WEPlatform;
+  var I18N = window.WEI18N;
+  var T = I18N.t, TN = I18N.tn;
 
   var $ = function (id) { return document.getElementById(id); };
 
@@ -50,17 +52,43 @@
     if (PL && PL.hosted) { PL.cloud.save(save); pushSettings(); } // debounced mirror; localStorage stays the cache
   }
 
-  // Cloud load is remote-preferred: a remote document wins over the local
-  // cache, which is exactly the "played on another device" case.
+  // Cloud load (boot, and after a refused conditional write): merge the cloud
+  // document with this device's progress instead of letting either side win
+  // (mergeSaves), keep this device's settings, and refresh the screens.
   function adoptRemoteSave(remote) {
     if (!remote || typeof remote !== "object") return false;
-    // Prefer remote outright; it is the mirror of record on the platform.
-    save = mergeSaveDefaults(remote);
+    save = mergeSaveDefaults(mergeSaves(remote, save));
     persist();
     applySettings();
     syncSettingsForm();
     updateTitleProgress();
+    if (currentScreen === "journey") renderJourney();
+    if (currentScreen === "records") renderRecords();
     return true;
+  }
+  // Keep both devices' progress: journey wins (fewest moves), achievements and
+  // daily days unioned, the larger records and best streak; the current
+  // streak and settings stay this device's.
+  function mergeSaves(remote, local) {
+    var out = JSON.parse(JSON.stringify(local || {}));
+    remote = remote || {};
+    var rj = remote.journey || {}, lj = out.journey = out.journey || {};
+    Object.keys(rj).forEach(function (id) {
+      var a = rj[id] || {}, b = lj[id] || {};
+      var moves = [a.bestMoves, b.bestMoves].filter(function (m) { return typeof m === "number" && m > 0; });
+      lj[id] = { won: !!(a.won || b.won), bestMoves: moves.length ? Math.min.apply(null, moves) : (b.bestMoves || a.bestMoves) };
+    });
+    var ach = out.achievements = out.achievements || {};
+    Object.keys(remote.achievements || {}).forEach(function (k) { if (remote.achievements[k]) ach[k] = true; });
+    var days = out.dailyDays = (out.dailyDays || []).slice();
+    (remote.dailyDays || []).forEach(function (d) { if (days.indexOf(d) < 0) days.push(d); });
+    days.sort();
+    var rr = remote.records || {}, lr = out.records = out.records || {};
+    ["bestScore", "roundsPlayed", "roundsWon"].forEach(function (k) { lr[k] = Math.max(+lr[k] || 0, +rr[k] || 0); });
+    out.bestStreak = Math.max(+out.bestStreak || 0, +remote.bestStreak || 0);
+    if (!out.settings && remote.settings) out.settings = remote.settings;
+    if ((!out.hosted || !out.hosted.code) && remote.hosted) out.hosted = remote.hosted;
+    return out;
   }
   function mergeSaveDefaults(o) {
     // Same migration as loadSave: fold the loaded doc over a fresh default set.
@@ -79,19 +107,21 @@
   var onStarhermitHost = /(^|\.)starhermit\.com$/i.test(location.hostname);
   var myName = null; // account nickname, fetched at boot when hosted
 
+  var syncState = null;
   function setSyncStatus(s) {
     var el = $("sync-status");
     if (!el) return;
+    syncState = s;
     el.hidden = false;
-    el.textContent = s === "saving" ? "Saving…" : s === "synced" ? "Synced ✓" : "Offline";
+    el.textContent = s === "saving" ? T("syncSaving") : s === "synced" ? T("syncSynced") : T("syncOffline");
     el.className = "sync-status sync-" + s;
   }
 
   function updateTitleProgress() {
     var doneCount = Object.keys(save.journey).filter(function (k) { return save.journey[k].won; }).length;
     $("title-progress").textContent =
-      save.records.roundsPlayed === 0 ? "Welcome aboard." :
-      "Journey " + doneCount + "/" + C.JOURNEY.length + " · streak " + save.streak + " · best score " + save.records.bestScore;
+      save.records.roundsPlayed === 0 ? T("welcome") :
+      T("titleProgress", { done: doneCount, total: C.JOURNEY.length, streak: save.streak, best: save.records.bestScore });
   }
 
   // Platform-time offset (ms). No time route is reachable (standalone play
@@ -131,6 +161,7 @@
     if (!PL) return;
     $("btn-signin").textContent = PL.t("signIn");
     $("btn-invite").textContent = PL.t("invite");
+    $("btn-invite-friend").textContent = PL.t("invite");
     $("btn-signin").hidden = !PL.canSignIn();
     $("btn-invite").hidden = !(PL.hosted && PL.inviteLink());
   }
@@ -184,9 +215,13 @@
   }
   function renderKeyHelp() {
     var a = $("help-keys-play"), b = $("help-keys-actions");
-    if (a) a.innerHTML = kbd("prev_card") + "/" + kbd("next_card") + " choose a card, " + kbd("play_card") + " play it";
-    if (b) b.innerHTML = kbd("draw") + " draw · " + kbd("hint") + " hint · " + kbd("undo") + " undo (practice) · " +
-      kbd("pause") + " pause · " + kbd("camera") + " reframe";
+    // Translations are escaped; the key markup (<kbd>) is inserted afterwards.
+    if (a) a.innerHTML = esc(T("keysPlay")).replace(/\{(\w+)\}/g, function (m, k) {
+      return { prev: kbd("prev_card"), next: kbd("next_card"), play: kbd("play_card") }[k] || m;
+    });
+    if (b) b.innerHTML = esc(T("keysActions")).replace(/\{(\w+)\}/g, function (m, k) {
+      return { draw: kbd("draw"), hint: kbd("hint"), undo: kbd("undo"), pause: kbd("pause"), camera: kbd("camera") }[k] || m;
+    });
   }
   function nowMs() { return Date.now() + timeOffset; }
   // ---------------------------------------------------------------------------
@@ -233,9 +268,9 @@
     document.body.classList.toggle("high-contrast", s.highContrast);
     document.body.classList.toggle("big-text", s.bigText);
     document.body.classList.toggle("left-handed", s.leftHanded);
-    $("btn-sound").textContent = s.muted ? "🔇 Muted" : "🔊 Sound";
+    $("btn-sound").textContent = s.muted ? T("soundMuted") : T("soundOn");
     $("btn-sound").setAttribute("aria-pressed", String(!s.muted));
-    $("btn-sound").title = s.muted ? "Unmute all audio" : "Mute all audio";
+    $("btn-sound").title = s.muted ? T("unmuteTitle") : T("muteTitle");
     if (UI.isReady()) {
       UI.setReducedMotion(s.reducedMotion);
       UI.setGraphics(s.gfx || {});
@@ -344,7 +379,7 @@
       b.type = "button";
       b.className = "card-btn suit-" + card.suit;
       b.textContent = W.rankName(card.rank) + " " + suitGlyph(card.suit);
-      b.setAttribute("aria-label", W.cardName(card) + (la.plays.indexOf(card.id) >= 0 && isHuman ? ", playable" : ""));
+      b.setAttribute("aria-label", la.plays.indexOf(card.id) >= 0 && isHuman ? T("cardPlayable", { card: cardName(card) }) : cardName(card));
       if (isHuman && la.plays.indexOf(card.id) >= 0) b.classList.add("legal");
       if (card.id === selectedCardId) b.classList.add("selected");
       b.dataset.cardId = card.id;
@@ -356,14 +391,14 @@
     // HUD text.
     var names = seatNames();
     var turnName = st.winner !== null ? "—" :
-      st.pendingSuitFor !== null ? names[st.pendingSuitFor] + " declaring a suit" :
-      names[st.current] + (st.current === myHand ? " (your turn)" : "");
-    $("turn-text").textContent = "Turn: " + turnName + " · Top: " + topText(st) + " · Suit: " + st.activeSuit;
+      st.pendingSuitFor !== null ? T("declaringSuit", { name: names[st.pendingSuitFor] }) :
+      st.current === myHand ? T("yourTurnTag", { name: names[st.current] }) : names[st.current];
+    $("turn-text").textContent = T("turnLine", { name: turnName, top: topText(st), suit: st.activeSuit ? I18N.suitName(st.activeSuit) : "—" });
     $("objective-text").textContent = objectiveText();
     $("opponents-text").textContent = st.hands.map(function (h, i) {
-      return i === myHand ? null : names[i] + ": " + h.length;
+      return i === myHand ? null : T("opponentCount", { name: names[i], n: h.length });
     }).filter(Boolean).join(" · ");
-    $("suit-banner").textContent = st.activeSuit ? "Active suit: " + suitGlyph(st.activeSuit) + " " + st.activeSuit : "";
+    $("suit-banner").textContent = st.activeSuit ? T("activeSuit", { glyph: suitGlyph(st.activeSuit), suit: I18N.suitName(st.activeSuit) }) : "";
     $("btn-draw").disabled = !isHuman;
     $("btn-undo").disabled = !(session.mode === "practice" && !session.noUndo && session.undoStack.length > 0 && !session.hosted);
     $("btn-hint").disabled = !isHuman;
@@ -382,9 +417,10 @@
       } else {
         $("tutorial-panel").hidden = false;
         $("tutorial-panel").dataset.require = t.require;
-        $("tutorial-title").textContent = t.title;
-        $("tutorial-body").textContent = t.body;
-        $("tutorial-progress").textContent = "Lesson " + (session.tutorialStep + 1) + " of " + C.TUTORIAL.length;
+        var tt = TN("tutorial", t.id, [t.title, t.body]);
+        $("tutorial-title").textContent = tt[0];
+        $("tutorial-body").textContent = tt[1];
+        $("tutorial-progress").textContent = T("lessonOf", { n: session.tutorialStep + 1, total: C.TUTORIAL.length });
       }
     } else {
       $("tutorial-panel").hidden = true;
@@ -392,12 +428,20 @@
   }
 
   function seatNames() {
-    if (!session || !session.hosted) return ["You", "Rival 1", "Rival 2", "Rival 3"];
-    if (session.names) return session.names;
+    if (!session || !session.hosted) return [T("you"), T("rivalN", { n: 1 }), T("rivalN", { n: 2 }), T("rivalN", { n: 3 })];
+    if (session.names) {
+      // Seat names arrive from the host; fallbacks and our own seat follow this client's language.
+      return session.names.map(function (nm, i) {
+        if (i === session.seat) return T("you");
+        var m = /^Player (\d+)$/.exec(nm || "");
+        return m ? T("playerN", { n: m[1] }) : nm;
+      });
+    }
     var n = [];
-    for (var i = 0; i < (session.state ? session.state.players : 4); i++) n.push("Player " + (i + 1));
+    for (var i = 0; i < (session.state ? session.state.players : 4); i++) n.push(T("playerN", { n: i + 1 }));
     return n;
   }
+  function cardName(card) { return I18N.cardName(card, W.rankName); }
 
   function suitGlyph(suit) {
     return { hearts: "♥", diamonds: "♦", clubs: "♣", spades: "♠" }[suit] || suit;
@@ -408,11 +452,11 @@
   }
   function objectiveText() {
     if (!session) return "";
-    if (session.state.winner !== null) return "Round over.";
-    var base = "Empty your hand first.";
-    if (session.moveLimit) base += " Move limit: " + session.state.moveCount + "/" + session.moveLimit + ".";
-    if (session.mode === "daily") base = "Daily seed · " + base;
-    if (session.stageId) base = "Stage " + session.stageId.slice(1) + " · " + base;
+    if (session.state.winner !== null) return T("roundOverDot");
+    var base = T("objective");
+    if (session.moveLimit) base += T("moveLimitLine", { n: session.state.moveCount, max: session.moveLimit });
+    if (session.mode === "daily") base = T("dailyPrefix", { text: base });
+    if (session.stageId) base = T("stagePrefix", { n: session.stageId.slice(1), text: base });
     return base;
   }
 
@@ -439,7 +483,7 @@
     delete pendingCmdIds[id];
     if (r.error) {
       A.play("error");
-      announce("Can't do that: " + (r.detail || r.error), true);
+      announce(T("cantDo", { reason: T(ERROR_KEYS[r.error] || "err_other") }), true);
       flashInvalid();
       return;
     }
@@ -464,14 +508,14 @@
 
   function onCardChosen(cardId) {
     if (!humanTurn() && !(session && session.hosted && session.state.current === session.seat)) {
-      announce("Not your turn yet.", true);
+      announce(T("notYourTurn"), true);
       return;
     }
     var la = W.legalActions(session.state);
     if (la.plays.indexOf(cardId) < 0) {
       A.play("error");
       var card = W.cardById(cardId);
-      announce("Can't play " + W.cardName(card) + ": must match " + session.state.activeSuit + " or rank " + W.rankName(session.state.discardPile[session.state.discardPile.length - 1].rank) + ", or play an 8.", true);
+      announce(T("cantPlay", { card: cardName(card), suit: I18N.suitName(session.state.activeSuit), rank: W.rankName(session.state.discardPile[session.state.discardPile.length - 1].rank) }), true);
       return;
     }
     A.play("confirm");
@@ -487,11 +531,11 @@
     if (!session) return;
     var st = session.state;
     if (st.winner !== null) return;
-    if (st.pendingSuitFor === (session.hosted ? session.seat : 0)) { announce("You played an 8. Declare a suit."); return; }
+    if (st.pendingSuitFor === (session.hosted ? session.seat : 0)) { announce(T("declarePrompt")); return; }
     if ((session.hosted ? st.current === session.seat : st.current === 0)) {
       A.play("turn");
       var la = W.legalActions(st);
-      announce(la.plays.length ? "Your turn. " + la.plays.length + " playable card" + (la.plays.length > 1 ? "s" : "") + "." : "Your turn. No playable cards — draw.");
+      announce(la.plays.length === 1 ? T("yourTurnOne") : la.plays.length ? T("yourTurnN", { n: la.plays.length }) : T("yourTurnDraw"));
     }
   }
 
@@ -510,7 +554,7 @@
     if (!isHuman || st.pendingSuitFor !== null) return;
     var la = W.legalActions(st);
     session.hintsUsed++;
-    if (la.plays.length === 0) { announce("Hint: draw from the stock.", true); return; }
+    if (la.plays.length === 0) { announce(T("hintDraw"), true); return; }
     var hand = st.hands[session.hosted ? session.seat : 0];
     var best = null, bestPts = -1;
     hand.forEach(function (c) {
@@ -518,7 +562,7 @@
     });
     if (!best) best = W.cardById(la.plays[0]);
     selectedCardId = best.id;
-    announce("Hint: try the " + W.cardName(best) + ".", true);
+    announce(T("hintTry", { card: cardName(best) }), true);
     rerender();
   }
 
@@ -535,7 +579,7 @@
     session.over = false;
     A.play("select");
     rerender();
-    announce("Undone.");
+    announce(T("undone"));
   }
 
   // ---------------------------------------------------------------------------
@@ -551,7 +595,7 @@
       var b = document.createElement("button");
       b.type = "button";
       b.className = "suit-btn suit-" + suit;
-      b.innerHTML = suitGlyph(suit) + "<span>" + suit + " (" + counts[suit] + ")</span>";
+      b.innerHTML = suitGlyph(suit) + "<span>" + esc(T("suitOption", { suit: I18N.suitName(suit), n: counts[suit] })) + "</span>";
       b.addEventListener("click", function () {
         show("game", false);
         screenStack = [];
@@ -560,7 +604,7 @@
       grid.appendChild(b);
     });
     show("suit", false);
-    announce("You played an 8. Declare a suit.", true);
+    announce(T("declarePrompt"), true);
   }
 
   // ---------------------------------------------------------------------------
@@ -579,9 +623,10 @@
       if (session.tutorialStep >= C.TUTORIAL.length) {
         save.settings.tutorialDone = true;
         persist();
-        announce("Tutorial complete!");
+        announce(T("tutorialComplete"));
       } else {
-        announce("Lesson complete. Next: " + C.TUTORIAL[session.tutorialStep].title);
+        var nt = C.TUTORIAL[session.tutorialStep];
+        announce(T("lessonNext", { title: TN("tutorial", nt.id, [nt.title])[0] }));
       }
     }
   }
@@ -621,32 +666,37 @@
       persist();
     }
 
-    // Fill results screen.
-    var resultNames = seatNames();
-    $("results-headline").textContent = won ? "You win the round!" :
-      (session.hosted ? resultNames[st.winner] : "Rival " + st.winner) + " wins the round.";
-    var tbody = $("results-table").querySelector("tbody");
-    tbody.innerHTML = "";
-    (st.score ? st.score.breakdown : []).forEach(function (row) {
-      var tr = document.createElement("tr");
-      var who = row.player === st.winner ? resultNames[row.player] + " ★" : resultNames[row.player];
-      tr.innerHTML = "<td></td><td>" + row.cards + "</td><td>" + row.points + "</td>";
-      tr.firstChild.textContent = who;
-      tbody.appendChild(tr);
-    });
-    $("results-total").textContent = st.score ? st.score.total : 0;
-    var extra = [];
-    extra.push("Ended: " + (st.terminalReason === "empty-hand" ? "a hand was emptied" : "stock exhausted"));
-    extra.push("your moves: " + st.moveCount);
-    if (session.moveLimit) extra.push(st.moveCount <= session.moveLimit && won ? "move limit met ✓" : "move limit: " + session.moveLimit);
-    extra.push("invalid actions: " + st.invalidActions);
-    extra.push("time: " + Math.round(elapsed / 1000) + "s");
-    extra.push("seed: " + session.replaySeed);
-    $("results-extra").textContent = extra.join(" · ");
-
+    // Fill results screen (kept as a redraw function for language changes).
     var newAch = pendingAchievements.slice();
     pendingAchievements = [];
-    $("results-achievements").textContent = newAch.length ? "Unlocked: " + newAch.join(", ") : "";
+    var round = session;
+    renderResultsText = function () {
+      var resultNames = seatNames();
+      $("results-headline").textContent = won ? T("youWin") :
+        T("winsRound", { name: round.hosted ? resultNames[st.winner] : T("rivalN", { n: st.winner }) });
+      var tbody = $("results-table").querySelector("tbody");
+      tbody.innerHTML = "";
+      (st.score ? st.score.breakdown : []).forEach(function (row) {
+        var tr = document.createElement("tr");
+        var who = row.player === st.winner ? resultNames[row.player] + " ★" : resultNames[row.player];
+        tr.innerHTML = "<td></td><td>" + row.cards + "</td><td>" + row.points + "</td>";
+        tr.firstChild.textContent = who;
+        tbody.appendChild(tr);
+      });
+      $("results-total").textContent = st.score ? st.score.total : 0;
+      var extra = [];
+      extra.push(st.terminalReason === "empty-hand" ? T("endedEmpty") : T("endedStock"));
+      extra.push(T("yourMoves", { n: st.moveCount }));
+      if (round.moveLimit) extra.push(st.moveCount <= round.moveLimit && won ? T("moveLimitMet") : T("moveLimitN", { n: round.moveLimit }));
+      extra.push(T("invalidN", { n: st.invalidActions }));
+      extra.push(T("timeN", { n: Math.round(elapsed / 1000) }));
+      extra.push(T("seedN", { seed: round.replaySeed }));
+      $("results-extra").textContent = extra.join(" · ");
+      $("results-achievements").textContent = newAch.length
+        ? T("unlockedList", { list: newAch.map(function (id) { return achievementName(id); }).join(", ") }) : "";
+      if (lbState) $("results-lb").textContent = PL.t(lbState.key, lbState.vars);
+    };
+    renderResultsText();
 
     // Next-stage button only in journey with a following stage.
     var nextBtn = $("btn-next-stage");
@@ -666,24 +716,30 @@
   // the player's rank on the results screen.
   function postToLeaderboard(total) {
     var line = $("results-lb");
+    lbState = null;
     if (total == null || !PL || !PL.hosted) { line.hidden = true; return; }
     line.hidden = false;
+    lbState = { key: "lbPosting" };
     line.textContent = PL.t("lbPosting");
     var round = session;
     PL.submitScore(total).then(function (r) {
       if (session !== round) return;
-      line.textContent = !r.posted ? PL.t("lbNotPosted")
-        : r.rank ? PL.t("lbRank", { rank: r.rank }) : PL.t("lbPosted");
+      lbState = !r.posted ? { key: "lbNotPosted" } : r.rank ? { key: "lbRank", vars: { rank: r.rank } } : { key: "lbPosted" };
+      line.textContent = PL.t(lbState.key, lbState.vars);
     });
   }
 
   var pendingAchievements = [];
+  var renderResultsText = null, lbState = null;
+  function achievementName(id) {
+    var meta = C.ACHIEVEMENTS.filter(function (a) { return a.id === id; })[0];
+    return TN("achievements", id, [meta ? meta.name : id])[0];
+  }
   function unlock(id) {
     if (save.achievements[id]) return;
     save.achievements[id] = true;
-    var meta = C.ACHIEVEMENTS.filter(function (a) { return a.id === id; })[0];
-    pendingAchievements.push(meta ? meta.name : id);
-    announce("Achievement unlocked: " + (meta ? meta.name : id));
+    pendingAchievements.push(id);
+    announce(T("achievementUnlocked", { name: achievementName(id) }));
   }
   function checkAchievements(won) {
     if (won) unlock("first_win");
@@ -701,7 +757,7 @@
   function startLearn() {
     newLocalSession("learn", { players: 2, difficulty: 0, handSize: 5 }, { seed: 1337 });
     enterGame();
-    announce("Lesson 1: " + C.TUTORIAL[0].title);
+    announce(T("lessonFirst", { title: TN("tutorial", C.TUTORIAL[0].id, [C.TUTORIAL[0].title])[0] }));
   }
   function startPractice(players, difficulty) {
     newLocalSession("practice", { players: players, difficulty: difficulty });
@@ -813,11 +869,21 @@
     if (onStarhermitHost) return "unavailable";
     return "local";
   }
-  function hostedError(msg) { $("hosted-error").textContent = msg; }
+  // Hosted-screen error line: a string key (re-rendered on a language change)
+  // or, for text that arrives from a server, the raw text.
+  var hostedErrorState = null;
+  function hostedError(key, raw) {
+    hostedErrorState = key ? { key: key, raw: raw } : null;
+    renderHostedError();
+  }
+  function renderHostedError() {
+    var e = hostedErrorState;
+    $("hosted-error").textContent = !e ? "" : e.raw != null ? e.raw : T(e.key);
+  }
   function hostedUnavailable() {
     $("hosted-join").hidden = true;
     $("hosted-lobby").hidden = true;
-    hostedError("Online tables aren't available for this launch. Practice, Journey, Daily and Challenges are fully playable.");
+    hostedError("hostedUnavailable");
   }
   // Entering the hosted screen: per-kind controls, invite inbox, reconnect.
   function hostedScreenShown() {
@@ -871,14 +937,14 @@
   }
   function localConnect(onOpen) {
     if (localWs && localWs.readyState === 1) { onOpen(); return; }
-    try { localWs = new WebSocket(localWsUrl()); } catch (e) { hostedError("WebSocket unavailable."); return; }
+    try { localWs = new WebSocket(localWsUrl()); } catch (e) { hostedError("wsUnavailable"); return; }
     localWs.onopen = onOpen;
     localWs.onmessage = localMessage;
-    localWs.onerror = function () { hostedError("Connection problem."); };
+    localWs.onerror = function () { hostedError("connProblem"); };
     localWs.onclose = function () {
       localState.connected = false;
       if (session && session.hosted && !session.over) {
-        announce("Disconnected. Rejoin with your table code to resume.", true);
+        announce(T("disconnectedLocal"), true);
       }
     };
   }
@@ -889,7 +955,7 @@
   function localMessage(ev) {
     var m;
     try { m = JSON.parse(ev.data); } catch (e) { return; }
-    if (m.type === "error") { hostedError(m.error); announce(m.error, true); return; }
+    if (m.type === "error") { hostedError("connProblem", String(m.error)); announce(String(m.error), true); return; }
     if (m.type === "hosted" || m.type === "joined") {
       localState.code = m.code; localState.seat = m.seat; localState.connected = true;
       save.hosted = { code: m.code, name: localState.name };
@@ -917,7 +983,7 @@
       var prevTick = session.state ? session.state.tick : -1;
       session.state = W.deserialize(m.snapshot, m.yourSeat);
       session.over = session.state.winner !== null;
-      if (m.away && m.away.length) announce("While you were away: " + m.away.join(" "), true);
+      if (m.away && m.away.length) announce(T("awayPrefix", { list: m.away.join(" ") }), true);
       if (m.events) UI.playEvents(m.events, session.state);
       rerender();
       // The server holds the round until this seat declares a suit, so the
@@ -933,15 +999,17 @@
     }
   }
 
+  var lastLobby = null; // { players, local } for language re-renders
   function updateLobby(players) {
+    lastLobby = { players: players, local: true };
     var ul = $("lobby-players");
     ul.innerHTML = "";
     players.forEach(function (p) {
       var li = document.createElement("li");
-      li.textContent = p.name + (p.seat === localState.seat ? " (you)" : "") + (p.ai ? " · AI" : "");
+      li.textContent = p.name + (p.seat === localState.seat ? T("youTag") : "") + (p.ai ? T("aiTag") : "");
       ul.appendChild(li);
     });
-    $("lobby-status").textContent = players.length + " seated · host starts the round; empty seats are filled by AI.";
+    $("lobby-status").textContent = T("lobbyStatus", { n: players.length });
   }
 
   function localDisplayName(fallback) {
@@ -1063,7 +1131,7 @@
     }).then(function (info) {
       roomEnter(info, true);
     }).catch(function () {
-      hostedError("Couldn't create a table. Try again.");
+      hostedError("createFailed");
     });
   }
 
@@ -1082,8 +1150,7 @@
       roomEnter(info, info.isHost);
     }).catch(function (e) {
       if (e && e.status === 404 && !code) return roomHostTable(); // no open table: make one
-      hostedError(e && e.status === 404 ? "No table with that code." :
-        "Couldn't join the table. Try again.");
+      hostedError(e && e.status === 404 ? "noTableCode" : "joinFailed");
     });
   }
 
@@ -1098,10 +1165,10 @@
       seatKeys: [], names: {}, hello: {}, state: null,
       lastCmdId: {}, awayLog: {}
     };
-    if (isHost) room.names[0] = myName || "You";
+    if (isHost) room.names[0] = myName || T("you");
     var ws;
     try { ws = new WebSocket(roomWsUrl(room.id)); }
-    catch (e) { hostedError("WebSocket unavailable."); room = null; return; }
+    catch (e) { hostedError("wsUnavailable"); room = null; return; }
     room.ws = ws;
     ws.binaryType = "arraybuffer";
     ws.onopen = function () {
@@ -1115,11 +1182,17 @@
       if (room.isHost) roomBroadcastLobby();
     };
     ws.onmessage = roomMessage;
-    ws.onerror = function () { hostedError("Connection problem."); };
+    ws.onerror = function () { hostedError("connProblem"); };
+    var everOpened = false;
+    ws.addEventListener("open", function () { everOpened = true; });
     ws.onclose = function () {
-      if (!room) return;
+      if (!room || room.ws !== ws) return;
       room.connected = false;
-      if (session && session.hosted && !session.over) announce("Disconnected from the table.", true);
+      // Mid-game drops don't auto-reconnect (by design: rejoin from Hosted
+      // Play). A socket refused before it opened may mean expired auth or
+      // pending terms, so ask the SDK which and say so visibly.
+      if (!everOpened) { roomOpenRefused(); return; }
+      if (session && session.hosted && !session.over) announce(T("disconnectedTable"), true);
     };
   }
 
@@ -1136,8 +1209,8 @@
     PL.api("/api/v1/realtime/rooms/" + encId(id) + "/leave", { method: "POST" }).catch(function () {});
     $("hosted-join").hidden = false;
     $("hosted-lobby").hidden = true;
-    $("hosted-error").textContent = "";
-    if (!quiet) announce("Left the table.");
+    hostedError(null);
+    if (!quiet) announce(T("leftTable"));
   }
 
   function roomSend(o) {
@@ -1173,7 +1246,7 @@
     try { m = JSON.parse(text); } catch (e) { return; }
     if (!m || typeof m !== "object") return;
     if (m.error || m.type === "error") {
-      hostedError(String(m.error || m.message || "Connection problem."));
+      hostedError("connProblem", m.error || m.message ? String(m.error || m.message) : null);
       return;
     }
     var roster = roomListOf(m, ["participants", "roster", "players", "seats"]);
@@ -1207,7 +1280,8 @@
       if (k && !present[k]) {
         var nm = room.names[seat] || ("Player " + (seat + 1));
         if (room.started) {
-          (room.awayLog[seat] = room.awayLog[seat] || []).push(nm + " left the table.");
+          // Structured so every client words it in its own language.
+          (room.awayLog[seat] = room.awayLog[seat] || []).push({ k: "awayLeft", name: nm });
           roomRunAIAndSnap(); // AI takes the seat's turn immediately
         }
         room.seatKeys[seat] = null;
@@ -1233,7 +1307,7 @@
         });
       }
       if (room.started && room.state) {
-        (room.awayLog[seat] = room.awayLog[seat] || []).push((room.names[seat] || ("Player " + (seat + 1))) + " joined the table.");
+        (room.awayLog[seat] = room.awayLog[seat] || []).push({ k: "awayJoined", name: room.names[seat] || ("Player " + (seat + 1)) });
       }
       if (room.hello[x.key]) room.names[seat] = room.names[seat] || room.hello[x.key];
     });
@@ -1253,7 +1327,7 @@
     var present = {};
     entries.forEach(function (x) { present[x.key] = true; });
     if (room.hostKey && !present[room.hostKey] && room.started) {
-      announce("The host left — the table is closed.", true);
+      announce(T("hostLeft"), true);
       roomLeaveTable();
       return;
     }
@@ -1299,7 +1373,7 @@
     for (var seat = 0; seat < 4; seat++) {
       var key = room.seatKeys[seat];
       if (key) players.push({ seat: seat, name: room.names[seat] || ("Player " + (seat + 1)), host: seat === 0, ai: false });
-      else if (room.started) players.push({ seat: seat, name: "AI " + seat, host: false, ai: true });
+      else if (room.started) players.push({ seat: seat, name: "AI " + seat, aiSeat: seat, host: false, ai: true });
     }
     return players;
   }
@@ -1310,16 +1384,18 @@
     updateRoomLobby(players);
   }
   function updateRoomLobby(players) {
+    lastLobby = { players: players, local: false };
     var ul = $("lobby-players");
     ul.innerHTML = "";
     players.forEach(function (p) {
       var li = document.createElement("li");
-      li.textContent = p.name + (p.host ? " (host)" : "") +
-        (room && p.seat === room.mySeat ? " (you)" : "") + (p.ai ? " · AI" : "");
+      var nm = p.ai ? T("aiSeat", { n: p.seat }) : (/^Player (\d+)$/.test(p.name) ? T("playerN", { n: p.name.slice(7) }) : p.name);
+      li.textContent = nm + (p.host ? T("hostTag") : "") +
+        (room && p.seat === room.mySeat ? T("youTag") : "") + (p.ai ? T("aiTag") : "");
       ul.appendChild(li);
     });
     var humans = players.filter(function (p) { return !p.ai; }).length;
-    $("lobby-status").textContent = humans + " seated · host starts the round; empty seats are filled by AI.";
+    $("lobby-status").textContent = T("lobbyStatus", { n: humans });
   }
 
   function roomStart() {
@@ -1408,7 +1484,7 @@
     }
     if (mySeat == null) mySeat = room.mySeat;
     if (mySeat == null || mySeat < 0) {
-      hostedError("Couldn't take a seat at this table.");
+      hostedError("cantSeat");
       return;
     }
     room.mySeat = mySeat;
@@ -1431,7 +1507,8 @@
     var names = [];
     var n = m.names || {};
     for (var i = 0; i < session.state.players; i++) names[i] = n[i] || ("Player " + (i + 1));
-    names[mySeat] = "You";
+    names[mySeat] = "You"; // seatNames() shows our seat as the localized "You"
+
     session.names = names;
     // Drawn card ids are private to the drawing seat.
     var events = (m.events || []).map(function (e) {
@@ -1444,7 +1521,7 @@
       return e;
     });
     var away = (m.away && m.away[mySeat]) || [];
-    if (away.length) announce("While you were away: " + away.join(" "), true);
+    if (away.length) announce(T("awayPrefix", { list: away.map(function (a) { return typeof a === "string" ? a : T(a.k, { name: a.name }); }).join(" ") }), true);
     if (events.length) UI.playEvents(events, session.state);
     rerender();
     // The round waits while this seat declares a suit — drive the picker from
@@ -1483,15 +1560,48 @@
           var info = roomJoinInfo(j);
           if (!info.id) return;
           roomEnter(info, info.isHost || info.seat === 0);
-        }).catch(function () {});
+        }).catch(function (e) {
+          // 404/410: no open table to return to (normal). Anything else: the
+          // rooms service can't be reached, so stop and say so.
+          if (e && (e.status === 404 || e.status === 410)) return;
+          tablesUnavailable();
+        });
       },
       onExpired: function () { roomReconnecting = null; sessionExpired(); },
-      onGiveUp: function () { roomReconnecting = null; }
+      onTermsRequired: function () { roomReconnecting = null; termsRequired(); },
+      // Renewal kept failing: stop the loop and say online tables are unavailable.
+      onGiveUp: function () { roomReconnecting = null; tablesUnavailable(); },
+      onUnavailable: function () { roomReconnecting = null; tablesUnavailable(); }
     });
   }
   function sessionExpired() {
     if (roomReconnecting) { roomReconnecting.cancel(); roomReconnecting = null; }
     PL.showExpired(PL);
+  }
+  // Updated StarHermit terms need consent: like auth loss, every table socket
+  // stops and the banner offers "Back to StarHermit" (the launcher asks).
+  function termsRequired() {
+    if (roomReconnecting) { roomReconnecting.cancel(); roomReconnecting = null; }
+    stopInvitePoll();
+    if (room) roomLeaveTable(true);
+    hostedError("termsRequiredShort");
+    PL.showExpired(PL, null, "termsRequired");
+  }
+  function tablesUnavailable() {
+    stopInvitePoll();
+    hostedError("tablesUnavailable");
+    if (currentScreen !== "hosted") announce(T("tablesUnavailable"), true);
+  }
+  // The room socket closed before it ever opened: find out why (the
+  // handshake is refused before the upgrade, so the browser only says 1006).
+  function roomOpenRefused() {
+    var r = room;
+    if (r) { room = null; $("hosted-join").hidden = false; $("hosted-lobby").hidden = true; }
+    PL.whyRefused().then(function (why) {
+      if (why === "terms-required") termsRequired();
+      else if (why === "relaunch") sessionExpired();
+      else hostedError("connectFailed");
+    });
   }
 
   // Friend invites: host sends them from the lobby; the invite inbox is polled
@@ -1514,19 +1624,19 @@
         if (!box) return;
         var list = roomListOf(j, ["invites", "items"]);
         if (!list || !list.length || room) { box.innerHTML = ""; return; }
-        box.innerHTML = "<p class=\"muted\">Table invitations:</p>";
+        box.innerHTML = "<p class=\"muted\">" + esc(T("tableInvites")) + "</p>";
         list.slice(0, 5).forEach(function (inv) {
           var roomId = inv.roomId || inv.id || (inv.room && (inv.room.id || inv.room.roomId));
           var from = inv.from || inv.fromUserId || inv.userId || (inv.fromUser && inv.fromUser.id);
           var b = document.createElement("button");
           b.type = "button";
           b.className = "btn small";
-          b.textContent = "Join table";
+          b.textContent = T("joinTable");
           b.addEventListener("click", function () { if (roomId) roomJoinTable(String(roomId)); });
           box.appendChild(b);
           if (from) {
             PL.getProfile(String(from)).then(function (p) {
-              if (p) b.textContent = "Join " + PL.displayName(p) + "'s table";
+              if (p) b.textContent = T("joinNamed", { name: PL.displayName(p) });
             });
           }
         });
@@ -1540,8 +1650,8 @@
         var box = $("lobby-friends");
         if (!box) return;
         var list = roomListOf(j, ["friends", "items"]);
-        if (!list || !list.length) { box.innerHTML = "<p class=\"muted\">No friends available to invite.</p>"; return; }
-        box.innerHTML = "<p class=\"muted\">Invite a friend:</p>";
+        if (!list || !list.length) { box.innerHTML = "<p class=\"muted\">" + esc(T("noFriends")) + "</p>"; return; }
+        box.innerHTML = "<p class=\"muted\">" + esc(T("inviteAFriend")) + "</p>";
         list.slice(0, 10).forEach(function (f) {
           var fid = f.id || f.userId || f.friendId;
           if (fid == null) return;
@@ -1549,8 +1659,8 @@
           b.type = "button";
           b.className = "btn small";
           var online = f.online ? " ●" : "";
-          b.textContent = "Invite " + (f.nickname || "friend") + online;
-          if (f.online) b.title = "Online now";
+          b.textContent = T("inviteName", { name: f.nickname || T("friend") }) + online;
+          if (f.online) b.title = T("onlineNow");
           b.addEventListener("click", function () {
             PL.api("/api/v1/realtime/rooms/" + encId(room.id) + "/invites", {
               method: "POST",
@@ -1558,13 +1668,13 @@
               body: JSON.stringify({ userId: fid })
             }).then(function (r) {
               b.disabled = r.ok;
-              if (r.ok) b.textContent = "Invited ✓";
+              if (r.ok) b.textContent = T("invited");
             }).catch(function () {});
           });
           box.appendChild(b);
           if (!f.nickname) {
             PL.getProfile(String(fid)).then(function (p) {
-              if (p && !b.disabled) b.textContent = "Invite " + PL.displayName(p) + online;
+              if (p && !b.disabled) b.textContent = T("inviteName", { name: PL.displayName(p) }) + online;
             });
           }
         });
@@ -1587,8 +1697,8 @@
       b.type = "button";
       b.className = "journey-stage" + (prog && prog.won ? " won" : "") + (unlocked ? "" : " locked");
       b.disabled = !unlocked;
-      b.innerHTML = "<strong>" + stage.index + "</strong><span>" + stage.name + "</span>" +
-        "<em>" + (prog && prog.won ? "★ " + (prog.bestMoves || "–") + " moves" : unlocked ? "open" : "🔒") + "</em>";
+      b.innerHTML = "<strong>" + stage.index + "</strong><span>" + esc(I18N.stageName(stage)) + "</span>" +
+        "<em>" + esc(prog && prog.won ? T("stageMoves", { n: prog.bestMoves || "–" }) : unlocked ? T("stageOpen") : "🔒") + "</em>";
       b.addEventListener("click", function () { startJourneyStage(stage); });
       li.appendChild(b);
       list.appendChild(li);
@@ -1596,7 +1706,7 @@
       if (stage.index === 1) unlocked = true;
       else unlocked = !!(save.journey["j" + (stage.index - 1)] && save.journey["j" + (stage.index - 1)].won) || !!(prog && prog.won);
     });
-    $("journey-summary").textContent = doneCount + " of " + C.JOURNEY.length + " stages complete.";
+    $("journey-summary").textContent = T("journeySummary", { n: doneCount, total: C.JOURNEY.length });
   }
 
   function renderChallenges() {
@@ -1606,7 +1716,9 @@
       var b = document.createElement("button");
       b.type = "button";
       b.className = "mode-card";
-      b.innerHTML = "<strong>" + ch.name + "</strong><span>" + ch.desc + "</span><em>seed " + ch.seed + " · " + ch.players + " players</em>";
+      var cd = TN("challenges", ch.id, [ch.name, ch.desc]);
+      b.dataset.challenge = ch.id;
+      b.innerHTML = "<strong>" + esc(cd[0]) + "</strong><span>" + esc(cd[1]) + "</span><em>" + esc(T("challengeMeta", { seed: ch.seed, n: ch.players })) + "</em>";
       b.addEventListener("click", function () { startChallenge(ch); });
       list.appendChild(b);
     });
@@ -1616,13 +1728,13 @@
     var body = $("records-body");
     var ach = C.ACHIEVEMENTS.map(function (a) {
       var got = save.achievements[a.id];
-      return "<li class=\"" + (got ? "got" : "") + "\">" + (got ? "★" : "☆") + " <strong>" + a.name + "</strong> — " + a.desc + "</li>";
+      var ad = TN("achievements", a.id, [a.name, a.desc]);
+      return "<li class=\"" + (got ? "got" : "") + "\">" + (got ? "★" : "☆") + " <strong>" + esc(ad[0]) + "</strong> — " + esc(ad[1]) + "</li>";
     }).join("");
     body.innerHTML =
-      "<p>Rounds played: " + save.records.roundsPlayed + " · won: " + save.records.roundsWon +
-      " · best score: " + save.records.bestScore + " · best streak: " + save.bestStreak + "</p>" +
-      "<p>Daily days played: " + save.dailyDays.length + "</p>" +
-      "<h3>Achievements</h3><ul class=\"ach-list\">" + ach + "</ul>";
+      "<p>" + esc(T("recordsLine", { played: save.records.roundsPlayed, won: save.records.roundsWon, best: save.records.bestScore, streak: save.bestStreak })) + "</p>" +
+      "<p>" + esc(T("dailyDays", { n: save.dailyDays.length })) + "</p>" +
+      "<h3>" + esc(T("achievementsH")) + "</h3><ul class=\"ach-list\">" + ach + "</ul>";
     var boardBox = $("records-board");
     if (boardBox) boardBox.innerHTML = "";
     if (onPlatform) renderPlatformBoard();
@@ -1641,9 +1753,9 @@
       if (me && typeof me === "object") {
         var bits = [];
         ["rank", "score", "wins", "losses", "gamesPlayed", "bestScore"].forEach(function (k) {
-          if (typeof me[k] === "number") bits.push(k + ": " + me[k]);
+          if (typeof me[k] === "number") bits.push(T("stat_" + k) + ": " + me[k]);
         });
-        if (bits.length) html += "<p class=\"muted\">Platform record — " + bits.join(" · ") + "</p>";
+        if (bits.length) html += "<p class=\"muted\">" + esc(T("platformRecord", { bits: bits.join(" · ") })) + "</p>";
       }
       box.innerHTML = html;
       return PL.leaderboard({ pageSize: 10 }).then(function (j) {
@@ -1657,15 +1769,15 @@
             "<td class=\"lb-name\" data-uid=\"" + esc(uid == null ? "" : uid) + "\">…</td>" +
             "<td>" + esc(score) + "</td></tr>";
         }).join("");
-        box.innerHTML += "<h3>Leaderboard</h3><table class=\"score-table\"><thead>" +
-          "<tr><th>#</th><th>Player</th><th>Score</th></tr></thead><tbody>" + rows + "</tbody></table>";
+        box.innerHTML += "<h3>" + esc(T("leaderboardH")) + "</h3><table class=\"score-table\"><thead>" +
+          "<tr><th>#</th><th>" + esc(T("colPlayer")) + "</th><th>" + esc(T("colScore")) + "</th></tr></thead><tbody>" + rows + "</tbody></table>";
         // Resolve user ids to nicknames via the profile helper (never usernames).
         entries.slice(0, 10).forEach(function (e, i) {
           var uid = e.userId != null ? e.userId : e.id;
           if (uid == null) return;
           PL.getProfile(String(uid)).then(function (p) {
             var cell = box.querySelectorAll(".lb-name")[i];
-            if (cell) cell.textContent = p ? PL.displayName(p) : "Player " + String(uid).slice(0, 8);
+            if (cell) cell.textContent = p ? PL.displayName(p) : T("playerN", { n: String(uid).slice(0, 8) });
           });
         });
       });
@@ -1812,7 +1924,7 @@
     $("join-form").addEventListener("submit", function (ev) {
       ev.preventDefault();
       var code = $("join-code").value.trim().toUpperCase();
-      if (code.length < 3) { hostedError("Enter the table code."); return; }
+      if (code.length < 3) { hostedError("enterCode"); return; }
       joinTable(code);
     });
     $("btn-start-hosted").addEventListener("click", startHostedRound);
@@ -1832,11 +1944,11 @@
     $("opt-lefthand").addEventListener("change", function (e) { s.leftHanded = e.target.checked; persist(); applySettings(); });
     $("btn-replay-tutorial").addEventListener("click", startLearn);
     $("btn-wipe").addEventListener("click", function () {
-      if (confirm("Erase all saved progress, achievements, and settings?")) {
+      if (confirm(T("wipeConfirm"))) {
         localStorage.removeItem(SAVE_KEY);
         save = loadSave();
         persist(); applySettings(); syncSettingsForm();
-        announce("Saved progress erased.");
+        announce(T("wiped"));
       }
     });
 
@@ -1844,7 +1956,7 @@
     var themeSel = $("opt-theme");
     C.THEMES.forEach(function (t) {
       var o = document.createElement("option");
-      o.value = t.id; o.textContent = t.name;
+      o.value = t.id; o.textContent = TN("themes", t.id, t.name);
       themeSel.appendChild(o);
     });
 
@@ -1891,8 +2003,34 @@
 
   // ---------------------------------------------------------------------------
   // Boot.
+  // ---------------------------------------------------------------------------
+  // Language change (Settings → Language, or the account preference arrived):
+  // static markup is already re-applied; re-render what code builds, in place.
+  // The round, the table socket and the room state are untouched.
+  function relocalize() {
+    if (syncState) setSyncStatus(syncState);
+    updateTitleProgress();
+    renderPlatformButtons();
+    if (bindings) renderKeyHelp();
+    applySettings(); // sound button label; rerenders the HUD/hand mirror/tutorial
+    Array.prototype.forEach.call($("opt-theme").options, function (o) {
+      var th = C.THEMES.filter(function (t) { return t.id === o.value; })[0];
+      if (th) o.textContent = TN("themes", th.id, th.name);
+    });
+    if (window.WEGraphicsPanel && window.WEGraphicsPanel.setLocale) window.WEGraphicsPanel.setLocale(I18N.locale());
+    if (currentScreen === "journey") renderJourney();
+    if (currentScreen === "challenges") renderChallenges();
+    if (currentScreen === "records") renderRecords();
+    if (currentScreen === "results" && renderResultsText) renderResultsText();
+    if (currentScreen === "suit" && session && session.state.pendingSuitFor === (session.hosted ? session.seat : 0)) openSuitPicker();
+    renderHostedError();
+    if (lastLobby && !$("hosted-lobby").hidden) (lastLobby.local ? updateLobby : updateRoomLobby)(lastLobby.players);
+    if (PL && PL.relabelBanner) PL.relabelBanner();
+  }
+
   function boot() {
     bind();
+    I18N.onLanguage(relocalize);
     setBindings(DEFAULT_BINDINGS);
     var theme = C.THEMES.filter(function (t) { return t.id === save.settings.theme; })[0] || C.THEMES[0];
     try {
@@ -1925,15 +2063,29 @@
         if (el && name) { el.hidden = false; el.textContent = name; }
         if (room && room.isHost) { room.names[0] = name; roomBroadcastLobby(); }
       });
-      // Remote-preferred load; localStorage stays the offline cache.
+      // Merged load; localStorage stays the offline cache.
       PL.cloud.load().then(function (remote) {
         adoptRemoteSave(remote);
         PL.cloud.markReady();
         PL.cloud.save(save); // mirror the merged doc back up
       });
+      // Another device saved since our load (conditional write refused):
+      // reload, merge both sides and save again.
+      PL.cloud.onConflict(function () {
+        PL.cloud.load().then(function (remote) {
+          adoptRemoteSave(remote);
+          PL.cloud.save(save);
+        });
+      });
+      PL.onTermsRequired(termsRequired);
     }
     show("title", false);
   }
+
+  var ERROR_KEYS = {
+    "illegal-card": "err_illegal", "card-not-in-hand": "err_notInHand", "must-declare-suit": "err_declareFirst",
+    "no-pending-suit": "err_noPending", "bad-suit": "err_badSuit", "game-over": "err_over"
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

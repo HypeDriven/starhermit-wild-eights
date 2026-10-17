@@ -7,7 +7,8 @@
 (function (root) {
   "use strict";
 
-  // Strings for the StarHermit buttons and toasts (all nine locales).
+  // Strings for the StarHermit buttons, toasts and stop banners (all nine
+  // locales), in the game language (WEI18N) — falling back to the browser.
   var EN = {
     signIn: "Sign in with StarHermit",
     invite: "Invite a friend",
@@ -16,6 +17,7 @@
     signedOut: "Signed out of StarHermit — playing locally.",
     sessionExpired: "Your StarHermit session expired.",
     relaunch: "Back to StarHermit",
+    termsRequired: "StarHermit needs you to accept its updated terms before you can play online.",
     lbPosting: "Posting score to the leaderboard…", lbRank: "Leaderboard rank: #{rank}",
     lbPosted: "Score posted to the leaderboard.", lbNotPosted: "Score not posted to the leaderboard."
   };
@@ -23,6 +25,7 @@
     "en-US": EN,
     "en-GB": EN,
     "es-419": {
+      termsRequired: "StarHermit necesita que aceptes sus términos actualizados antes de jugar en línea.",
       signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
       inviteCopied: "Enlace de invitación copiado al portapapeles.",
       inviteFailed: "No se pudo copiar. Enlace de invitación: {link}",
@@ -32,6 +35,7 @@
       lbPosted: "Puntuación enviada a la clasificación.", lbNotPosted: "No se envió la puntuación a la clasificación."
     },
     "es-ES": {
+      termsRequired: "StarHermit necesita que aceptes sus términos actualizados antes de jugar en red.",
       signIn: "Iniciar sesión con StarHermit", invite: "Invitar a un amigo",
       inviteCopied: "Enlace de invitación copiado al portapapeles.",
       inviteFailed: "No se ha podido copiar. Enlace de invitación: {link}",
@@ -41,6 +45,7 @@
       lbPosted: "Puntuación enviada a la clasificación.", lbNotPosted: "No se ha enviado la puntuación a la clasificación."
     },
     "de-DE": {
+      termsRequired: "StarHermit braucht deine Zustimmung zu den aktualisierten Bedingungen, bevor du online spielen kannst.",
       signIn: "Mit StarHermit anmelden", invite: "Freund einladen",
       inviteCopied: "Einladungslink in die Zwischenablage kopiert.",
       inviteFailed: "Kopieren fehlgeschlagen. Einladungslink: {link}",
@@ -50,6 +55,7 @@
       lbPosted: "Punktzahl an die Bestenliste gesendet.", lbNotPosted: "Punktzahl nicht an die Bestenliste gesendet."
     },
     "fr-FR": {
+      termsRequired: "StarHermit a besoin que vous acceptiez ses conditions mises à jour avant de jouer en ligne.",
       signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
       inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
       inviteFailed: "Copie impossible. Lien d’invitation : {link}",
@@ -59,6 +65,7 @@
       lbPosted: "Score envoyé au classement.", lbNotPosted: "Score non envoyé au classement."
     },
     "fr-CA": {
+      termsRequired: "StarHermit a besoin que vous acceptiez ses conditions mises à jour avant de jouer en ligne.",
       signIn: "Se connecter avec StarHermit", invite: "Inviter un ami",
       inviteCopied: "Lien d’invitation copié dans le presse-papiers.",
       inviteFailed: "Impossible de copier. Lien d’invitation : {link}",
@@ -68,6 +75,7 @@
       lbPosted: "Pointage envoyé au classement.", lbNotPosted: "Pointage non envoyé au classement."
     },
     "pt-BR": {
+      termsRequired: "O StarHermit precisa que você aceite os termos atualizados antes de jogar online.",
       signIn: "Entrar com StarHermit", invite: "Convidar um amigo",
       inviteCopied: "Link de convite copiado para a área de transferência.",
       inviteFailed: "Não foi possível copiar. Link de convite: {link}",
@@ -77,6 +85,7 @@
       lbPosted: "Pontuação enviada para o ranking.", lbNotPosted: "A pontuação não foi enviada para o ranking."
     },
     "it-IT": {
+      termsRequired: "StarHermit ha bisogno che tu accetti i termini aggiornati prima di giocare online.",
       signIn: "Accedi con StarHermit", invite: "Invita un amico",
       inviteCopied: "Link di invito copiato negli appunti.",
       inviteFailed: "Impossibile copiare. Link di invito: {link}",
@@ -91,6 +100,10 @@
     if (gp && gp.pickLocale) return gp.pickLocale(tag);
     return STRINGS[tag] ? tag : "en-US";
   }
+  function gameLocale() {
+    if (root.WEI18N) return root.WEI18N.locale();
+    return typeof navigator !== "undefined" && (navigator.languages && navigator.languages[0] || navigator.language);
+  }
   function translator(locale) {
     var table = STRINGS[pickLocale(locale)] || EN;
     return function (key, vars) {
@@ -104,13 +117,18 @@
     env = env || {};
     var setT = env.setTimeout || (typeof setTimeout === "function" ? setTimeout : null);
     var clearT = env.clearTimeout || (typeof clearTimeout === "function" ? clearTimeout : null);
-    var statusHandler = null, authHandler = null;
+    var statusHandler = null, authHandler = null, conflictHandler = null, termsHandler = null;
     var ready = false; // first cloud load finished — safe to write
     var active = !!(sh && sh.token);
 
     function setStatus(s) { if (statusHandler) statusHandler(s); }
     if (sh) {
-      sh.on("saved", function (ok) { if (active) setStatus(ok ? "synced" : "offline"); });
+      sh.on("saved", function (ok) { if (active && !(sh.saveConflicted && sh.saveConflicted())) setStatus(ok ? "synced" : "offline"); });
+      // A write lost to a newer save from another device: app.js reloads,
+      // merges and saves again.
+      sh.on("saveconflict", function () { if (active && conflictHandler) { setStatus("saving"); conflictHandler(); } });
+      // A renewal answered terms_acceptance_required: online play must stop.
+      sh.on("termsrequired", function () { if (termsHandler) termsHandler(); });
       sh.on("auth", function (e) {
         if (e && e.signedIn) return;
         active = false;
@@ -162,7 +180,8 @@
         sh.saveJSON(doc, 2000);
       },
       flush: function () { if (active && ready) sh.flushSave(true); },
-      markReady: function () { ready = true; }
+      markReady: function () { ready = true; },
+      onConflict: function (fn) { conflictHandler = fn; }
     };
     if (typeof addEventListener === "function" && typeof document !== "undefined") {
       addEventListener("pagehide", cloud.flush);
@@ -173,7 +192,9 @@
     // token (the handshake is refused before the upgrade and the browser only
     // reports 1006), so the token is renewed first and h.open() builds the
     // URL from the fresh token. 'retry' backs off (delays) without reopening
-    // the old URL; 'relaunch' stops for good and calls h.onExpired().
+    // the old URL; 'relaunch' stops for good and calls h.onExpired();
+    // 'terms-required' (updated StarHermit terms need consent) stops and calls
+    // h.onTermsRequired(); running out of retries calls h.onGiveUp().
     var RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
     function reconnect(h) {
       var attempt = 0, timer = null, stopped = false;
@@ -185,6 +206,7 @@
         p.then(function (r) {
           if (stopped) return;
           if (r === "renewed") { stopped = true; h.open(); return; }
+          if (r === "terms-required") { stopped = true; if (h.onTermsRequired) h.onTermsRequired(); else if (h.onExpired) h.onExpired(); return; }
           if (r !== "retry") { stopped = true; if (h.onExpired) h.onExpired(); return; }
           if (attempt >= delays.length || !setT) { stopped = true; if (h.onGiveUp) h.onGiveUp(); return; }
           timer = setT(step, delays[attempt++]);
@@ -209,6 +231,12 @@
       // Built at open time from the current (possibly renewed) token.
       roomSocketUrl: function (roomId) { return sh.realtime.socketUrl(roomId); },
       reconnect: reconnect,
+      // Why a socket was refused before it opened: 'renewed' / 'retry' (try
+      // later), 'relaunch' (auth gone) or 'terms-required'.
+      whyRefused: function () {
+        return sh && sh.renewForReconnect ? sh.renewForReconnect() : Promise.resolve("retry");
+      },
+      onTermsRequired: function (fn) { termsHandler = fn; },
       relaunch: function () { return !!(sh && sh.relaunch()); },
       cloud: cloud,
       gameInfo: function () { return active ? sh.getGame() : Promise.resolve(null); },
@@ -236,16 +264,19 @@
       canSignIn: function () { return !!(sh && sh.canSignIn()); },
       signIn: function () { return !!(sh && sh.signIn()); },
       inviteLink: function () { return active ? sh.inviteLink() : null; },
-      t: translator(typeof navigator !== "undefined" && (navigator.languages && navigator.languages[0] || navigator.language)),
+      t: function (key, vars) { return translator(gameLocale())(key, vars); },
       translator: translator,
       onStatus: function (fn) { statusHandler = fn; },
       onAuth: function (fn) { authHandler = fn; }
     };
   }
 
-  // "Your session expired" banner with a "Back to StarHermit" button; the
-  // click (a user gesture) sends the player to the launcher for a new token.
-  function showExpired(P, doc) {
+  // "Your session expired" (or "accept the updated terms") banner with a
+  // "Back to StarHermit" button; the click (a user gesture) sends the player
+  // to the launcher for a new token. msgKey defaults to sessionExpired.
+  var bannerKey = null;
+  function showExpired(P, doc, msgKey) {
+    bannerKey = msgKey || "sessionExpired";
     doc = doc || root.document;
     if (!doc) return null;
     var box = doc.getElementById("sh-expired");
@@ -266,15 +297,24 @@
       doc.body.appendChild(box);
       box.msg = msg; box.btn = btn;
     }
-    (box.msg || box.querySelector(".sh-expired-msg")).textContent = P.t("sessionExpired");
+    (box.msg || box.querySelector(".sh-expired-msg")).textContent = P.t(bannerKey);
     (box.btn || box.querySelector("button")).textContent = P.t("relaunch");
     box.hidden = false;
     return box;
+  }
+  /** Re-word a visible stop banner after a language change. */
+  function relabelBanner(doc) {
+    doc = doc || root.document;
+    var box = doc && doc.getElementById("sh-expired");
+    if (!box || box.hidden || !bannerKey) return;
+    box.querySelector(".sh-expired-msg").textContent = WEPlatform.t(bannerKey);
+    box.querySelector("button").textContent = WEPlatform.t("relaunch");
   }
 
   var WEPlatform = create(root.StarHermit || null);
   WEPlatform.create = create;
   WEPlatform.showExpired = showExpired;
+  WEPlatform.relabelBanner = relabelBanner;
   WEPlatform.STRINGS = STRINGS;
   root.WEPlatform = WEPlatform;
   if (typeof module !== "undefined" && module.exports) module.exports = WEPlatform;

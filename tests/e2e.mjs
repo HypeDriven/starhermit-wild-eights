@@ -34,6 +34,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { launchToken, stubStarHermit } from './starhermit-e2e.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOT = (stage, vp) => `/tmp/wild-eights-e2e-${stage}-${vp}.png`;
@@ -429,6 +430,140 @@ async function runGraphicsPass(browser, name, ctxOpts) {
   console.log(`ok - ${name}: graphics pass has no console errors or warnings`);
 }
 
+// ---------- language + report + terms pass (signed in, stubbed StarHermit API) ----------
+// Automatic follows the account's preferred language (fr-CA); choosing Italian
+// in Settings relabels it in place and PUTs ui.language; Report a problem posts
+// to /reports; a German practice round shows German HUD text at this viewport
+// without overlaps; Automatic from the pause menu re-renders mid-round. On
+// desktop, a renewal answering terms_acceptance_required on the Hosted Play
+// screen stops online play with the terms banner and Back to StarHermit.
+async function runLanguagePass(browser, name, ctxOpts) {
+  const errors = [];
+  const context = await browser.newContext(ctxOpts);
+  const page = await context.newPage();
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
+    // The stubbed 403 (terms pending) is the scenario under test, not a fault.
+    if (/Failed to load resource/.test(m.text()) && /\/api\//.test(m.location()?.url || '')) return;
+    errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  const useTap = !!ctxOpts.hasTouch;
+  let termsMode = false;
+  try {
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem('wild-eights-save-v1', JSON.stringify({ version: 1, settings: { tutorialDone: true, reducedMotion: true, muted: true } }));
+      } catch (e) { /* private mode */ }
+    });
+    const calls = await stubStarHermit(page, {
+      preferredLanguage: 'fr-CA',
+      'POST /api/v1/games/[^/]+/launch-token': (route) => (termsMode
+        ? route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify({ error: 'terms_acceptance_required' }) })
+        : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: launchToken() }) })),
+    });
+    await page.goto('about:blank');
+    await page.goto(BASE + '/index.html#game_token=' + launchToken(), { waitUntil: 'load' });
+    await page.waitForSelector('#screen-title.active', { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA', null, { timeout: 15000 });
+    if ((await page.textContent('#btn-play')).trim() !== 'Jouer') throw new Error('title not in French');
+    ok(`${name}: Automatic follows the account language (fr-CA)`);
+
+    await tapOrClick(page, '#btn-settings', useTap);
+    await page.waitForSelector('#screen-settings.active');
+    const choice = page.locator('#screen-settings [data-game-language="choice"]');
+    await choice.scrollIntoViewIfNeeded();
+    const auto = (await choice.locator('option').first().textContent()).trim();
+    if (auto !== 'Automatique — Français (Canada)') throw new Error(`Automatic label not resolved: "${auto}"`);
+    if ((await page.locator('[data-game-language="choice"]').count()) !== 1) throw new Error('expected exactly one language selector');
+    await choice.selectOption('it-IT');
+    await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+    await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]').textContent));
+    if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+    const rel = await page.evaluate(() => ({
+      h: document.getElementById('settings-h').textContent, gfx: document.getElementById('gfx-legend').textContent,
+      q: document.getElementById('gfx-quality-label').textContent, rm: document.querySelector('[data-i18n="reducedMotion"]').textContent,
+    }));
+    if (rel.h !== 'Impostazioni' || rel.gfx !== 'Grafica' || rel.rm !== 'Movimento ridotto') throw new Error('Settings not re-rendered: ' + JSON.stringify(rel));
+    ok(`${name}: Italian chosen in Settings — relabelled in place, ui.language saved`);
+    await page.locator('[data-game-report="title"]').scrollIntoViewIfNeeded();
+    await page.fill('[data-game-report="title"]', 'Test report');
+    await tapOrClick(page, '[data-game-report="send"]', useTap);
+    await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+    if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+    await page.screenshot({ path: SHOT('language', name) });
+    ok(`${name}: Report a problem posted to /reports`);
+
+    // German practice round.
+    await choice.selectOption('de-DE');
+    await page.waitForFunction(() => document.documentElement.lang === 'de-DE');
+    await tapOrClick(page, '#screen-settings .back-btn', useTap);
+    await page.waitForSelector('#screen-title.active');
+    await page.screenshot({ path: SHOT('german-title', name) });
+    await tapOrClick(page, '#btn-play', useTap);
+    await page.waitForSelector('#screen-modes.active');
+    await tapOrClick(page, '.mode-card[data-mode="practice"]', useTap);
+    await page.waitForSelector('#screen-setup.active');
+    await tapOrClick(page, '#setup-form button[type="submit"]', useTap);
+    await page.waitForSelector('#screen-game.active');
+    await page.waitForFunction(() => /^Leere/.test(document.getElementById('objective-text').textContent));
+    await page.waitForSelector('#hand-list .card-btn');
+    const handBefore = await handButtons(page).count();
+    const layout = await page.evaluate(() => {
+      const vis = (e) => e && e.offsetParent !== null;
+      const r = (e) => e.getBoundingClientRect();
+      const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const btns = [...document.querySelectorAll('.topbar button, .hud-actions .btn, #btn-draw')].filter(vis);
+      const cut = btns.some((e) => r(e).right > innerWidth + 1 || r(e).left < -1 || e.scrollWidth > e.clientWidth + 1);
+      let clash = false;
+      for (let i = 0; i < btns.length; i++) for (let j = i + 1; j < btns.length; j++) if (overlap(r(btns[i]), r(btns[j]))) clash = true;
+      const status = [...document.querySelectorAll('.topbar .sync-status, .topbar .profile-name')].filter(vis);
+      for (const st of status) for (const b of btns) if (overlap(r(st), r(b))) clash = true;
+      return { cut, clash, scrollX: document.documentElement.scrollWidth > innerWidth };
+    });
+    if (layout.cut || layout.clash || layout.scrollX) throw new Error('German HUD layout problem: ' + JSON.stringify(layout));
+    await page.screenshot({ path: SHOT('german-play', name) });
+    ok(`${name}: German round shows German HUD text, nothing overlaps (${handBefore} cards in hand)`);
+
+    // Back to Automatic mid-round from the pause menu.
+    await tapOrClick(page, '#btn-pause', useTap);
+    await page.waitForSelector('#screen-pause.active');
+    if ((await page.textContent('#pause-h')).trim() !== 'Pausiert') throw new Error('pause not German');
+    await tapOrClick(page, '#btn-pause-settings', useTap);
+    await page.waitForSelector('#screen-settings.active');
+    await choice.scrollIntoViewIfNeeded();
+    await choice.selectOption('auto');
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+    await tapOrClick(page, '#screen-settings .back-btn', useTap);
+    await page.waitForSelector('#screen-pause.active');
+    if ((await page.textContent('#pause-h')).trim() !== 'En pause') throw new Error('pause not re-rendered');
+    await tapOrClick(page, '#btn-resume', useTap);
+    await page.waitForFunction(() => /^Videz/.test(document.getElementById('objective-text').textContent));
+    if ((await handButtons(page).count()) !== handBefore) throw new Error('round restarted');
+    ok(`${name}: Automatic mid-round re-renders the HUD in French without restarting`);
+
+    if (!useTap) {
+      // Terms consent pending: the Hosted Play reconnect check stops visibly.
+      termsMode = true;
+      await tapOrClick(page, '#btn-pause', false);
+      await tapOrClick(page, '#btn-quit', false);
+      await page.waitForSelector('#screen-title.active');
+      await tapOrClick(page, '#btn-hosted', false);
+      await page.waitForSelector('#screen-hosted.active');
+      await page.waitForSelector('#sh-expired:not([hidden])', { timeout: 10000 });
+      const banner = await page.textContent('#sh-expired .sh-expired-msg');
+      const btn = await page.textContent('#sh-expired button');
+      const err = await page.textContent('#hosted-error');
+      if (!/conditions/.test(banner) || !/StarHermit/.test(btn) || !err) throw new Error(`terms not shown: ${banner} / ${btn} / ${err}`);
+      await page.screenshot({ path: SHOT('terms', name) });
+      ok(`${name}: terms-required stops online play with the terms banner ("${btn.trim()}")`);
+    }
+  } finally {
+    await context.close();
+  }
+  if (errors.length) throw new Error(`${name} language pass had page errors:\n  ${errors.join('\n  ')}`);
+}
+
 // ---------- main ----------
 let browser = null;
 try {
@@ -442,6 +577,8 @@ try {
     { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, { full: false });
   await runGraphicsPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } });
   await runGraphicsPass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await runLanguagePass(browser, 'desktop', { viewport: { width: 1280, height: 800 } });
+  await runLanguagePass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   console.log('\nE2E PASS — wild-eights, desktop + mobile, no page errors');
 } catch (e) {
   failures++;
