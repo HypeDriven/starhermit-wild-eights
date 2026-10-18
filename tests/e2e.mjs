@@ -375,6 +375,8 @@ async function runGraphicsPass(browser, name, ctxOpts) {
     await page.waitForFunction(() => document.body.getAttribute('data-gfx-preset') === 'high' &&
       document.querySelector('#table canvas')?.getAttribute('data-gfx-preset') === 'high');
     await page.waitForFunction(() => /2048² shadows/.test(document.getElementById('gfx-summary').textContent));
+    const sumText = await page.textContent('#gfx-summary');
+    if (!/ · Level 0 · /.test(sumText)) throw new Error(`summary lacks the hardware level: ${sumText}`);
     const shadowLabel = await page.locator('#opt-gfx-shadows option[value="preset"]').textContent();
     if (!/Medium/.test(shadowLabel)) throw new Error(`From-preset label wrong: "${shadowLabel}"`);
     ok(`${name}: graphics preset Low → High applied (${(await page.textContent('#gfx-summary')).trim()})`);

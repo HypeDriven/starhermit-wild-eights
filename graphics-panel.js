@@ -23,7 +23,7 @@
     t_fxaa: "FXAA", t_smaa: "SMAA", t_msaa: "MSAA", t_static: "Static", t_animated: "Animated",
     t_plain: "Plain", t_detailed: "Detailed",
     postNote: "Post-processing is unavailable in this browser, so the table is drawn without it.",
-    unavailable: "3D view unavailable",
+    unavailable: "3D view unavailable", level: "Level {n}",
     sumNoShadows: "no shadows", sumShadows: "shadows", sumAo: "ambient occlusion", sumAoHigh: "full ambient occlusion",
     sumBloom: "bloom", sumReflections: "reflections", sumNoAa: "no anti-aliasing"
   };
@@ -42,7 +42,7 @@
     t_fxaa: "FXAA", t_smaa: "SMAA", t_msaa: "MSAA", t_static: "Estática", t_animated: "Animada",
     t_plain: "Simple", t_detailed: "Detallado",
     postNote: "El posprocesado no está disponible en este navegador; la mesa se dibuja sin él.",
-    unavailable: "Vista 3D no disponible",
+    unavailable: "Vista 3D no disponible", level: "Nivel {n}",
     sumNoShadows: "sin sombras", sumShadows: "sombras", sumAo: "oclusión ambiental", sumAoHigh: "oclusión ambiental completa",
     sumBloom: "resplandor", sumReflections: "reflejos", sumNoAa: "sin antialiasing"
   };
@@ -58,7 +58,7 @@
     t_fxaa: "FXAA", t_smaa: "SMAA", t_msaa: "MSAA", t_static: "Statique", t_animated: "Animée",
     t_plain: "Simple", t_detailed: "Détaillé",
     postNote: "Le post-traitement n'est pas disponible dans ce navigateur ; la table est affichée sans lui.",
-    unavailable: "Vue 3D indisponible",
+    unavailable: "Vue 3D indisponible", level: "Niveau {n}",
     sumNoShadows: "sans ombres", sumShadows: "ombres", sumAo: "occlusion ambiante", sumAoHigh: "occlusion ambiante complète",
     sumBloom: "halo", sumReflections: "reflets", sumNoAa: "sans anticrénelage"
   };
@@ -80,7 +80,7 @@
       t_fxaa: "FXAA", t_smaa: "SMAA", t_msaa: "MSAA", t_static: "Statisch", t_animated: "Animiert",
       t_plain: "Einfach", t_detailed: "Detailliert",
       postNote: "Nachbearbeitung ist in diesem Browser nicht verfügbar; der Tisch wird ohne sie gezeichnet.",
-      unavailable: "3D-Ansicht nicht verfügbar",
+      unavailable: "3D-Ansicht nicht verfügbar", level: "Stufe {n}",
       sumNoShadows: "keine Schatten", sumShadows: "Schatten", sumAo: "Umgebungsverdeckung", sumAoHigh: "volle Umgebungsverdeckung",
       sumBloom: "Leuchteffekt", sumReflections: "Spiegelungen", sumNoAa: "keine Kantenglättung"
     },
@@ -98,7 +98,7 @@
       t_fxaa: "FXAA", t_smaa: "SMAA", t_msaa: "MSAA", t_static: "Estática", t_animated: "Animada",
       t_plain: "Simples", t_detailed: "Detalhado",
       postNote: "O pós-processamento não está disponível neste navegador; a mesa é desenhada sem ele.",
-      unavailable: "Visão 3D indisponível",
+      unavailable: "Visão 3D indisponível", level: "Nível {n}",
       sumNoShadows: "sem sombras", sumShadows: "sombras", sumAo: "oclusão ambiente", sumAoHigh: "oclusão ambiente completa",
       sumBloom: "brilho", sumReflections: "reflexos", sumNoAa: "sem antisserrilhamento"
     },
@@ -114,7 +114,7 @@
       t_fxaa: "FXAA", t_smaa: "SMAA", t_msaa: "MSAA", t_static: "Statica", t_animated: "Animata",
       t_plain: "Semplice", t_detailed: "Dettagliato",
       postNote: "La post-elaborazione non è disponibile in questo browser; il tavolo viene disegnato senza.",
-      unavailable: "Vista 3D non disponibile",
+      unavailable: "Vista 3D non disponibile", level: "Livello {n}",
       sumNoShadows: "senza ombre", sumShadows: "ombre", sumAo: "occlusione ambientale", sumAoHigh: "occlusione ambientale completa",
       sumBloom: "bagliore", sumReflections: "riflessi", sumNoAa: "senza antialiasing"
     }
@@ -253,7 +253,7 @@
       note.hidden = true;
       return;
     }
-    sum.textContent = inf.gpu + " · " + GFX.describe(inf.resolved, inf.pixels, tr);
+    sum.textContent = [inf.gpu, isFinite(inf.level) && inf.level !== null ? tr("level", "Level {n}", { n: inf.level }) : null, GFX.describe(inf.resolved, inf.pixels, tr)].filter(Boolean).join(" · ");
     note.textContent = tr("postNote");
     note.hidden = !inf.postFailed;
   }

@@ -5,15 +5,49 @@ const assert = require("node:assert");
 const G = require("../gfx.js");
 const P = require("../graphics-panel.js");
 
-test("detectPreset maps GPU strings to tiers", () => {
-  assert.strictEqual(G.detectPreset("ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))"), "low");
-  assert.strictEqual(G.detectPreset("llvmpipe (LLVM 15.0.7, 256 bits)"), "low");
-  assert.strictEqual(G.detectPreset("ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11)"), "high");
-  assert.strictEqual(G.detectPreset("Apple M2 Pro"), "high");
-  assert.strictEqual(G.detectPreset("ANGLE (Intel, Intel(R) UHD Graphics 620)"), "balanced");
-  assert.strictEqual(G.detectPreset(""), "balanced");
-  assert.strictEqual(G.detectPreset("Apple M2 Pro", { mobile: true }), "balanced", "mobile Auto is capped");
-  assert.strictEqual(G.detectPreset("SwiftShader", { mobile: true }), "low");
+const DESK = { cores: 8, memoryGb: 8 };
+const PHONE = { mobile: true, cores: 8, memoryGb: 8 };
+
+test("hardware level picks the Auto preset (Low 0, Balanced 4, High 10, Ultra 17)", () => {
+  assert.strictEqual(G.detectPreset("ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))", DESK), "low");
+  assert.strictEqual(G.detectLevel("llvmpipe (LLVM 15.0.7, 256 bits)", DESK), 0);
+  assert.strictEqual(G.detectPreset("", DESK), "low", "no WebGL");
+  assert.strictEqual(G.detectPreset("ANGLE (AMD, AMD Radeon(TM) Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)", DESK), "low");
+  assert.strictEqual(G.detectPreset("ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11)", DESK), "low");
+  assert.strictEqual(G.detectPreset("ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11)", DESK), "balanced");
+  assert.strictEqual(G.detectPreset("ANGLE (NVIDIA, NVIDIA GeForce GTX 1070 Direct3D11 vs_5_0 ps_5_0)", DESK), "high");
+  assert.strictEqual(G.detectPreset("ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Direct3D11 vs_5_0 ps_5_0)", DESK), "ultra");
+  assert.strictEqual(G.detectLevel("ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 Direct3D11 vs_5_0 ps_5_0)", DESK), 20);
+  assert.strictEqual(G.detectPreset("ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 Direct3D11 vs_5_0 ps_5_0)", DESK), "ultra");
+  Object.keys(G.LEVELS).forEach((p) => assert.strictEqual(G.presetForLevel(G.LEVELS[p]), p));
+  assert.strictEqual(G.presetForLevel(3), "low");
+  assert.strictEqual(G.presetForLevel(16), "high");
+});
+
+test("phones and tablets are Balanced at most; software GPUs stay Low", () => {
+  assert.strictEqual(G.detectPreset("Adreno (TM) 740", PHONE), "balanced");
+  assert.ok(G.detectLevel("Adreno (TM) 740", PHONE) <= 9);
+  assert.strictEqual(G.detectPreset("Apple M2 Pro", PHONE), "balanced");
+  assert.strictEqual(G.detectPreset("SwiftShader", PHONE), "low");
+});
+
+test("per-preset budget table: explicit, never cheaper from Low to Ultra, counts scale with the level", () => {
+  const keys = ["material", "cardTex", "surfTex", "segments", "sparks", "dust", "bloomRes", "aoRes"];
+  G.PRESETS.forEach((p) => keys.forEach((k) => assert.notStrictEqual(G.BUDGETS[p][k], undefined, p + "." + k)));
+  for (let i = 1; i < G.PRESETS.length; i++) {
+    keys.slice(1).forEach((k) => assert.ok(G.BUDGETS[G.PRESETS[i]][k] >= G.BUDGETS[G.PRESETS[i - 1]][k], G.PRESETS[i] + "." + k));
+  }
+  assert.deepStrictEqual(G.PRESETS.map((p) => G.BUDGETS[p].material), ["lambert", "standard", "physical", "physical"]);
+  assert.deepStrictEqual(G.PRESETS.map((p) => G.BUDGETS[p].bloomRes), [0.5, 0.5, 0.5, 1]);
+  assert.strictEqual(G.budgetFor("high", 10).dust, G.BUDGETS.high.dust);
+  assert.strictEqual(G.budgetFor("high", 0).dust, G.BUDGETS.high.dust, "a forced preset never drops below its budget");
+  assert.ok(G.budgetFor("high", 13).dust > G.BUDGETS.high.dust);
+  assert.strictEqual(G.budgetFor("low", 9).dust, G.BUDGETS.low.dust * 2, "at most 2x within a preset");
+  assert.ok(G.budgetFor("ultra", 20).dust <= G.DUST_MAX && G.budgetFor("ultra", 20).sparks <= G.SPARK_MAX);
+  const r = G.resolve({ preset: "balanced" }, "low", 4);
+  assert.strictEqual(r.level, 4);
+  assert.deepStrictEqual(r.budget, G.budgetFor("balanced", 4));
+  assert.strictEqual(G.resolve({}, "low", 0).budget.material, "lambert");
 });
 
 test("resolve applies preset, overrides and scale clamp", () => {

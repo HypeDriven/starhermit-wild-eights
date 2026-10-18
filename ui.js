@@ -20,7 +20,7 @@ import * as THREE from "./three.module.min.js";
   // Resolved graphics tiers (see gfx.js). Replaced by setGraphics().
   var q = GFX.resolve({}, "low");
   var gfxSaved = {};
-  var gpuName = "", detected = "low";
+  var gpuName = "", detected = "low", gpuLevel = 0;
 
   // Suit palettes: default and color-vision-safe (shape coding is always on).
   var SUIT_COLORS = {
@@ -88,6 +88,24 @@ import * as THREE from "./three.module.min.js";
 
   function detailed() { return q.detail === "detailed"; }
 
+  // Shading per the preset's budget, for Surface detail on: Lambert (Low), Standard (Balanced) and the
+  // clear-coat Physical extras (High/Ultra). Plain detail keeps the original flat Lambert look.
+  var LAMBERT_KEYS = ["color", "map", "side", "transparent", "opacity", "emissive"];
+  function surface(params, extras) {
+    var kind = q.budget.material, k, p = {};
+    if (kind === "lambert") {
+      LAMBERT_KEYS.forEach(function (key) { if (params[key] !== undefined) p[key] = params[key]; });
+      return new THREE.MeshLambertMaterial(p);
+    }
+    if (kind === "physical" && extras) {
+      for (k in params) p[k] = params[k];
+      for (k in extras) p[k] = extras[k];
+      return new THREE.MeshPhysicalMaterial(p);
+    }
+    return new THREE.MeshStandardMaterial(params);
+  }
+  function seg(n, min) { return Math.max(min || 3, Math.round(n * q.budget.segments)); }
+
   function finishTexture(c) {
     var tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -98,14 +116,14 @@ import * as THREE from "./three.module.min.js";
   // The card geometry is itself rounded, so faces fill the whole canvas; the
   // outermost pixels are paper-coloured and double as the card's edge.
   function cardFaceTexture(card) {
-    var k = detailed() ? 2 : 1;
+    var k = detailed() ? q.budget.cardTex : 1;
     var key = card.id + ":" + suitPalette + ":" + k;
     if (texCache[key]) return texCache[key];
     var c = document.createElement("canvas");
-    c.width = 128 * k; c.height = 180 * k;
+    c.width = Math.round(128 * k); c.height = Math.round(180 * k);
     var g = c.getContext("2d");
     g.scale(k, k);
-    if (k > 1) {
+    if (detailed()) {
       var grad = g.createLinearGradient(0, 0, 128, 180);
       grad.addColorStop(0, "#fffef8"); grad.addColorStop(1, "#f1ece0");
       g.fillStyle = grad;
@@ -141,11 +159,11 @@ import * as THREE from "./three.module.min.js";
   }
 
   function cardBackTexture() {
-    var k = detailed() ? 2 : 1;
+    var k = detailed() ? q.budget.cardTex : 1;
     var key = "back:" + k;
     if (texCache[key]) return texCache[key];
     var c = document.createElement("canvas");
-    c.width = 128 * k; c.height = 180 * k;
+    c.width = Math.round(128 * k); c.height = Math.round(180 * k);
     var g = c.getContext("2d");
     g.scale(k, k);
     g.fillStyle = "#f4efe4"; // white card margin (and edge)
@@ -179,14 +197,17 @@ import * as THREE from "./three.module.min.js";
   // Greyscale procedural surfaces, tinted by the material colour so every
   // theme reuses them. Deterministic seeds keep captures stable.
   var surfCache = {};
+  // Drawn in the authored pixel space and scaled by the preset's surfTex budget.
   function surfaceTexture(kind) {
-    if (surfCache[kind]) return surfCache[kind];
+    var sc = q.budget.surfTex, ck = kind + ":" + sc;
+    if (surfCache[ck]) return surfCache[ck];
     var rnd = prng(kind === "felt" ? 11 : kind === "wood" ? 23 : 37);
     var c = document.createElement("canvas");
     var g = c.getContext("2d");
     var i, x, y, v;
+    var size = function (w, h) { c.width = Math.round(w * sc); c.height = Math.round(h * sc); g.scale(sc, sc); };
     if (kind === "felt") {
-      c.width = c.height = 256;
+      size(256, 256);
       g.fillStyle = "#e6e6e6"; g.fillRect(0, 0, 256, 256);
       for (i = 0; i < 9000; i++) {
         x = rnd() * 256; y = rnd() * 256; v = Math.floor(200 + rnd() * 55);
@@ -194,7 +215,7 @@ import * as THREE from "./three.module.min.js";
         g.fillRect(x, y, 1 + rnd() * 2, 1);
       }
     } else if (kind === "wood") {
-      c.width = 512; c.height = 128;
+      size(512, 128);
       g.fillStyle = "#d8d8d8"; g.fillRect(0, 0, 512, 128);
       for (i = 0; i < 70; i++) {
         y = rnd() * 128; v = Math.floor(150 + rnd() * 105);
@@ -205,7 +226,7 @@ import * as THREE from "./three.module.min.js";
         g.stroke();
       }
     } else { // carpet: a railway moquette of small diamonds
-      c.width = c.height = 128;
+      size(128, 128);
       g.fillStyle = "#9a9a9a"; g.fillRect(0, 0, 128, 128);
       g.fillStyle = "#c8c8c8";
       for (y = 0; y < 128; y += 32) for (x = 0; x < 128; x += 32) {
@@ -218,7 +239,7 @@ import * as THREE from "./three.module.min.js";
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     if (renderer) tex.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-    surfCache[kind] = tex;
+    surfCache[ck] = tex;
     return tex;
   }
 
@@ -263,6 +284,10 @@ import * as THREE from "./three.module.min.js";
   var legalCardIds = [];
   var onTurn = false;
   var particleGroup = null, particleGeo = null;
+  // High-tier sparks: one additive instanced mesh (a single draw call) instead of a mesh per spark.
+  // Under additive blending fading the instance colour is the same as fading its opacity.
+  var SPARK_POOL = 512, sparkMesh = null, sparks = [];
+  var _sm4 = new THREE.Matrix4(), _sq = new THREE.Quaternion(), _sv = new THREE.Vector3(), _sc = new THREE.Color(), _sz = new THREE.Vector3(0, 0, 1);
 
   function roundedShape(w, h, r) {
     var s = new THREE.Shape();
@@ -295,10 +320,10 @@ import * as THREE from "./three.module.min.js";
   }
 
   function cardMaterial(tex) {
-    var key = tex.uuid + ":" + q.detail;
+    var key = tex.uuid + ":" + q.detail + ":" + q.budget.material;
     if (matCache[key]) return matCache[key];
     var m = detailed()
-      ? new THREE.MeshPhysicalMaterial({ map: tex, color: 0xf2f2f2, roughness: 0.55, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.35, envMapIntensity: 0.15 })
+      ? surface({ map: tex, color: 0xf2f2f2, roughness: 0.55, metalness: 0, envMapIntensity: 0.15 }, { clearcoat: 0.25, clearcoatRoughness: 0.35 })
       : new THREE.MeshLambertMaterial({ map: tex });
     matCache[key] = m;
     return m;
@@ -317,29 +342,29 @@ import * as THREE from "./three.module.min.js";
     var t = theme;
     var rich = detailed();
     var woodMat = rich
-      ? new THREE.MeshPhysicalMaterial({ color: t.wood, map: surfaceTexture("wood"), roughness: 0.42, clearcoat: 0.5, clearcoatRoughness: 0.25, envMapIntensity: 0.35 })
+      ? surface({ color: t.wood, map: surfaceTexture("wood"), roughness: 0.42, envMapIntensity: 0.35 }, { clearcoat: 0.5, clearcoatRoughness: 0.25 })
       : new THREE.MeshLambertMaterial({ color: t.wood });
     // Table: wood skirt, rounded bumper rail, brass inlay and felt.
-    var skirt = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 7.3, 0.9, 64, 1, true), woodMat);
+    var skirt = new THREE.Mesh(new THREE.CylinderGeometry(7.6, 7.3, 0.9, seg(64, 24), 1, true), woodMat);
     skirt.rotation.x = Math.PI / 2; skirt.position.z = -0.55;
     skirt.castShadow = true;
     envGroup.add(skirt);
-    var rail = new THREE.Mesh(new THREE.TorusGeometry(7.45, 0.26, rich ? 12 : 6, 72), woodMat);
+    var rail = new THREE.Mesh(new THREE.TorusGeometry(7.45, 0.26, rich ? seg(12, 6) : 6, seg(72, 32)), woodMat);
     rail.position.z = -0.12;
     rail.receiveShadow = true;
     rail.castShadow = true;
     envGroup.add(rail);
     var feltMat = rich
-      ? new THREE.MeshStandardMaterial({ color: t.felt, map: surfaceTexture("felt"), roughness: 0.95, metalness: 0, envMapIntensity: 0.25 })
+      ? surface({ color: t.felt, map: surfaceTexture("felt"), roughness: 0.95, metalness: 0, envMapIntensity: 0.25 })
       : new THREE.MeshLambertMaterial({ color: t.felt });
     if (rich) { feltMat.map.repeat.set(5, 5); }
-    var felt = new THREE.Mesh(new THREE.CircleGeometry(7.25, 72), feltMat);
+    var felt = new THREE.Mesh(new THREE.CircleGeometry(7.25, seg(72, 32)), feltMat);
     felt.position.z = -0.06;
     felt.receiveShadow = true;
     envGroup.add(felt);
     var brass = new THREE.Mesh(
-      new THREE.RingGeometry(6.55, 6.63, 96),
-      rich ? new THREE.MeshStandardMaterial({ color: 0xc9a25a, metalness: 1, roughness: 0.42 })
+      new THREE.RingGeometry(6.55, 6.63, seg(96, 40)),
+      rich ? surface({ color: 0xc9a25a, metalness: 1, roughness: 0.42 })
            : new THREE.MeshLambertMaterial({ color: 0xb8924e })
     );
     brass.position.z = -0.055;
@@ -347,7 +372,7 @@ import * as THREE from "./three.module.min.js";
     // Compartment floor: moquette carpet far below the table top.
     var floorColor = new THREE.Color(t.wall).multiplyScalar(rich ? 1.1 : 1.5);
     var floorMat = rich
-      ? new THREE.MeshStandardMaterial({ color: floorColor, map: surfaceTexture("carpet"), roughness: 1, envMapIntensity: 0.15 })
+      ? surface({ color: floorColor, map: surfaceTexture("carpet"), roughness: 1, envMapIntensity: 0.15 })
       : new THREE.MeshLambertMaterial({ color: floorColor });
     if (rich) floorMat.map.repeat.set(24, 24);
     var floor = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), floorMat);
@@ -358,14 +383,14 @@ import * as THREE from "./three.module.min.js";
     lampGroup = new THREE.Group();
     lampGroup.position.set(0, 1.5, 7.5);
     var shade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.35, 0.95, 0.7, 32, 1, true),
-      rich ? new THREE.MeshStandardMaterial({ color: 0xc9a25a, metalness: 1, roughness: 0.35, side: THREE.DoubleSide })
+      new THREE.CylinderGeometry(0.35, 0.95, 0.7, seg(32, 12), 1, true),
+      rich ? surface({ color: 0xc9a25a, metalness: 1, roughness: 0.35, side: THREE.DoubleSide })
            : new THREE.MeshLambertMaterial({ color: 0x8a6a3a, side: THREE.DoubleSide })
     );
     shade.rotation.x = Math.PI / 2; shade.position.z = 0.35;
     lampGroup.add(shade);
     bulbMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(t.lamp) });
-    var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 14), bulbMat);
+    var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.42, seg(20, 10), seg(14, 7)), bulbMat);
     lampGroup.add(bulb);
     envGroup.add(lampGroup);
     // Passing platform lights: a soft band that sweeps across the felt.
@@ -392,7 +417,7 @@ import * as THREE from "./three.module.min.js";
     if (dust) { scene.remove(dust); dust.geometry.dispose(); dust.material.dispose(); dust = null; }
     if (q.particles !== "high") return;
     var rnd = prng(5);
-    var n = 90, pos = new Float32Array(n * 3);
+    var n = q.budget.dust, pos = new Float32Array(n * 3);
     for (var i = 0; i < n; i++) {
       var r = Math.sqrt(rnd()) * 4, a = rnd() * Math.PI * 2;
       pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = Math.sin(a) * r * 0.8 - 1; pos[i * 3 + 2] = 0.6 + rnd() * 5;
@@ -455,8 +480,9 @@ import * as THREE from "./three.module.min.js";
 
   function setGraphics(saved) {
     gfxSaved = saved || {};
-    var prevDetail = q.detail, prevParticles = q.particles;
-    q = GFX.resolve(gfxSaved, detected);
+    var prevDetail = q.detail, prevParticles = q.particles, prevBudget = JSON.stringify(q.budget);
+    q = GFX.resolve(gfxSaved, detected, gpuLevel);
+    var budgetChanged = prevBudget !== JSON.stringify(q.budget);
     document.body.setAttribute("data-gfx-preset", q.preset);
     if (!renderer) return;
     renderer.domElement.setAttribute("data-gfx-preset", q.preset);
@@ -468,13 +494,13 @@ import * as THREE from "./three.module.min.js";
       if (keyLight.shadow.map) { keyLight.shadow.map.dispose(); keyLight.shadow.map = null; }
     }
     applyReflections();
-    if (prevDetail !== q.detail) {
+    if (prevDetail !== q.detail || budgetChanged) {
       disposeCardCaches();
       clearGroup(envGroup);
       buildEnvironment();
     }
     applyBulb();
-    if (prevParticles !== q.particles || !dust === (q.particles === "high")) buildDust();
+    if (prevParticles !== q.particles || budgetChanged || !dust === (q.particles === "high")) buildDust();
     adaptiveScale = 1;
     frames = [];
     postKey = null; // rebuild the post chain on the next frame
@@ -547,7 +573,7 @@ import * as THREE from "./three.module.min.js";
   };
 
   function currentPostKey(w, h) {
-    return q.post && postMods && !postFailed ? [q.ao, q.bloom, q.grade, q.antialias, w, h, pixelRatio].join("|") : "none";
+    return q.post && postMods && !postFailed ? [q.ao, q.bloom, q.grade, q.antialias, q.budget.bloomRes, q.budget.aoRes, w, h, pixelRatio].join("|") : "none";
   }
 
   function disposeComposer() {
@@ -556,6 +582,15 @@ import * as THREE from "./three.module.min.js";
       composer.dispose();
     }
     composer = null; gradePass = null;
+  }
+
+  // Run a post pass at a fraction of the frame: EffectComposer.addPass/setSize hand every pass the full
+  // frame size, so the pass's own setSize applies the budget's scale (half-res bloom/GTAO below Ultra).
+  function atScale(pass, k) {
+    if (!(k < 1)) return pass;
+    var setSize = pass.setSize.bind(pass);
+    pass.setSize = function (w, h) { setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+    return pass;
   }
 
   function buildPost(w, h) {
@@ -575,12 +610,12 @@ import * as THREE from "./three.module.min.js";
         ao.blendIntensity = 0.75;
         ao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.4, thickness: 0.6, scale: 1.0, samples: q.ao === "high" ? 16 : 8 });
         ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: q.ao === "high" ? 6 : 4, rings: 2, samples: q.ao === "high" ? 16 : 8 });
-        c.addPass(ao);
+        c.addPass(atScale(ao, q.budget.aoRes));
       }
       if (q.bloom === "on") {
         // High threshold on the linear HDR buffer (before tone mapping): only
         // the lamp bulb, sparks and the brightest highlights bloom.
-        c.addPass(new P.UnrealBloomPass(new THREE.Vector2(pw, ph), 0.45, 0.4, BLOOM_THRESHOLD));
+        c.addPass(atScale(new P.UnrealBloomPass(new THREE.Vector2(pw, ph), 0.45, 0.4, BLOOM_THRESHOLD), q.budget.bloomRes));
       }
       if (q.grade === "on") {
         gradePass = new P.ShaderPass(GradeShader);
@@ -639,6 +674,7 @@ import * as THREE from "./three.module.min.js";
     return {
       gpu: gpuName || "unknown GPU",
       detected: detected,
+      level: gpuLevel,
       resolved: q,
       pixels: px,
       fps: Math.round(fps),
@@ -675,8 +711,17 @@ import * as THREE from "./three.module.min.js";
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     gpuName = gpuString(renderer);
-    detected = GFX.detectPreset(gpuName, { mobile: isMobileDevice() });
-    q = GFX.resolve(opts.graphics || {}, detected);
+    // StarHermit hardware level (gpu-level.js): renderer string + device facts (phone/tablet, cores, memory).
+    var sys = { mobile: isMobileDevice() };
+    try {
+      if (window.StarHermitGpu) {
+        var d = window.StarHermitGpu.detectSystem();
+        sys = { mobile: sys.mobile || d.mobile, webgl2: d.webgl2, touch: d.touch, screen: d.screen, cores: d.cores, memoryGb: d.memoryGb, astc: d.astc };
+      }
+    } catch (e) { /* defaults */ }
+    gpuLevel = GFX.detectLevel(gpuName, sys);
+    detected = GFX.presetForLevel(gpuLevel);
+    q = GFX.resolve(opts.graphics || {}, detected, gpuLevel);
     gfxSaved = opts.graphics || {};
     container.appendChild(renderer.domElement);
     renderer.domElement.setAttribute("aria-hidden", "true"); // DOM mirror owns a11y
@@ -728,6 +773,15 @@ import * as THREE from "./three.module.min.js";
     particleGroup = new THREE.Group();
     particleGeo = new THREE.PlaneGeometry(1, 1);
     scene.add(particleGroup);
+    sparkMesh = new THREE.InstancedMesh(particleGeo, new THREE.MeshBasicMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
+    }), SPARK_POOL);
+    sparkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    sparkMesh.setColorAt(0, new THREE.Color(0));
+    sparkMesh.count = 0;
+    sparkMesh.frustumCulled = false;
+    sparkMesh.raycast = function () {};
+    scene.add(sparkMesh);
 
     // Pointer picking against explicit card layer only.
     renderer.domElement.addEventListener("pointermove", function (ev) {
@@ -770,9 +824,19 @@ import * as THREE from "./three.module.min.js";
   function burst(pos, color, strong) {
     if (reducedMotion) return;
     var high = q.particles === "high";
-    var n = high ? (strong ? 36 : 22) : 8;
+    var n = high ? Math.round((strong ? 36 : 22) * q.budget.sparks) : 8;
     var c = new THREE.Color(color);
     if (high && q.bloom === "on") c.multiplyScalar(2.2); // sparks bloom
+    if (high) {
+      for (var j = 0; j < n && sparks.length < SPARK_POOL; j++) {
+        sparks.push({
+          pos: pos.clone(), color: c.clone(), s: 0.05 + Math.random() * 0.07, rot: Math.random() * Math.PI,
+          vel: new THREE.Vector3((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, 2 + Math.random() * 2.5),
+          spin: (Math.random() - 0.5) * 8, life: 0.9, max: 0.9
+        });
+      }
+      return;
+    }
     for (var i = 0; i < n; i++) {
       var m = new THREE.Mesh(particleGeo, new THREE.MeshBasicMaterial({
         color: c, transparent: true, opacity: 1, depthWrite: false,
@@ -857,6 +921,25 @@ import * as THREE from "./three.module.min.js";
       m.rotation.z += m.userData.spin * dt;
       m.material.opacity = Math.max(0, m.userData.life / m.userData.max);
       if (m.userData.life <= 0) { m.material.dispose(); particleGroup.remove(m); }
+    }
+    for (var sp = sparks.length - 1; sp >= 0; sp--) {
+      var k2 = sparks[sp];
+      k2.life -= dt;
+      if (k2.life <= 0) { sparks[sp] = sparks[sparks.length - 1]; sparks.pop(); continue; }
+      k2.pos.addScaledVector(k2.vel, dt);
+      k2.vel.z -= 6 * dt;
+      k2.rot += k2.spin * dt;
+    }
+    if (sparkMesh) {
+      for (var si = 0; si < sparks.length; si++) {
+        var k3 = sparks[si];
+        _sm4.compose(k3.pos, _sq.setFromAxisAngle(_sz, k3.rot), _sv.set(k3.s, k3.s, k3.s));
+        sparkMesh.setMatrixAt(si, _sm4);
+        sparkMesh.setColorAt(si, _sc.copy(k3.color).multiplyScalar(Math.max(0, k3.life / k3.max)));
+      }
+      sparkMesh.count = sparks.length;
+      sparkMesh.visible = sparks.length > 0;
+      if (sparks.length) { sparkMesh.instanceMatrix.needsUpdate = true; sparkMesh.instanceColor.needsUpdate = true; }
     }
     ambient(dt);
     if (adapt(dtMs)) resize();
