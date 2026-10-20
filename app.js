@@ -1616,6 +1616,10 @@
   function stopInvitePoll() {
     if (inviteTimer) { clearInterval(inviteTimer); inviteTimer = null; }
   }
+  // The inbox buttons are rebuilt only when the invites (or the language)
+  // change: a poll replacing a Join button between press and release would
+  // lose the click.
+  var inviteSig = "";
   function pollInvites() {
     PL.api("/api/v1/realtime/rooms/invites")
       .then(function (r) { return r.ok ? r.json().catch(function () { return null; }) : null; })
@@ -1623,11 +1627,20 @@
         var box = $("hosted-invites");
         if (!box) return;
         var list = roomListOf(j, ["invites", "items"]);
-        if (!list || !list.length || room) { box.innerHTML = ""; return; }
+        if (!list || !list.length || room) { box.innerHTML = ""; inviteSig = ""; return; }
+        var invites = list.slice(0, 5).map(function (inv) {
+          return {
+            roomId: inv.roomId || inv.id || (inv.room && (inv.room.id || inv.room.roomId)),
+            from: inv.from || inv.fromUserId || inv.userId || (inv.fromUser && inv.fromUser.id)
+          };
+        });
+        var sig = JSON.stringify([T("tableInvites"), T("joinTable"), invites]);
+        if (sig === inviteSig && box.childElementCount) return;
+        inviteSig = sig;
         box.innerHTML = "<p class=\"muted\">" + esc(T("tableInvites")) + "</p>";
-        list.slice(0, 5).forEach(function (inv) {
-          var roomId = inv.roomId || inv.id || (inv.room && (inv.room.id || inv.room.roomId));
-          var from = inv.from || inv.fromUserId || inv.userId || (inv.fromUser && inv.fromUser.id);
+        invites.forEach(function (inv) {
+          var roomId = inv.roomId;
+          var from = inv.from;
           var b = document.createElement("button");
           b.type = "button";
           b.className = "btn small";

@@ -232,7 +232,7 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Discovery, activity, and social layer
 - Entitlement or catalog state belongs to host-owned chrome; the game stays playable without promotional interruption. No launch-activity calls are made.
-- The hosted lobby has a friends picker (`StarHermit.friends()`, online friends marked ●) that sends realtime-room invitations, and the Hosted Play screen polls the room-invite inbox with join buttons. The title's invite link covers friends who are not yet connected.
+- The hosted lobby has a friends picker (`StarHermit.friends()`, online friends marked ●) that sends realtime-room invitations, and the Hosted Play screen polls the room-invite inbox (every 5 s) with join buttons, rebuilt only when the invites or the language change so a poll never swallows a Join press. The title's invite link covers friends who are not yet connected.
 - There is no in-game text chat or voice: realtime rooms carry no chat conversation for launch tokens, and core rules never need it.
 
 ### Achievements and leaderboards
