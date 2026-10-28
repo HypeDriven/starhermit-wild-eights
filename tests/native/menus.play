@@ -1,0 +1,57 @@
+# Menus on a desktop window: the title, How to Play (the top bar's ?),
+# Settings with the erase confirmation cancelled, Records, Journey, Hosted
+# Play signed out, then the Daily round's table, the pause dialog and back.
+# viewport 1280x720@1
+until 600 Wild Eights
+frames 60
+save we-title
+click =How to play
+until 300 Eights are wild
+frames 10
+save we-help
+click =Back
+until 300 =Settings
+frames 10
+click =Settings
+until 300 =Erase saved progress
+frames 10
+save we-settings
+click =Erase saved progress
+until 300 =Cancel
+frames 10
+save we-wipe
+click =Cancel
+frames 10
+click =Back
+until 300 =Records
+frames 10
+click =Records
+until 300 Rounds played
+frames 30
+save we-records
+click =Back
+until 300 =Hosted Play
+frames 10
+click =Hosted Play
+until 300 Sign in with StarHermit to host
+frames 10
+save we-hosted
+click =Back
+until 300 =Daily Challenge
+frames 10
+click =Daily Challenge
+until 600 (your turn)
+frames 120
+save we-daily
+key ArrowRight 1
+frames 5
+key ArrowRight 1
+frames 10
+save we-daily-select
+click =Pause
+until 300 =Resume
+frames 10
+save we-pause
+click =Leave round
+until 300 =Daily Challenge
+frames 10

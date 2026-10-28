@@ -1,0 +1,129 @@
+/* Wild Eights — the browser build's styles.css rewritten class-based for the
+   engine's UI (`npm run css` converts it into assets/ui-style.json). Element
+   selectors, ids, body classes and @media do not convert: every widget names
+   its classes, the breakpoints are layouts picked in native/screens.ts, high
+   contrast is a token set native/style.ts applies, larger text is the
+   runtime's text scale, and the hand tray's card buttons are drawn widgets
+   (native/screens.ts cardButton). */
+:root {
+  --bg-top: #1c2733; --bg-bottom: #0e141b; --panel: rgba(255, 255, 255, 0.08); --panel-solid: #1a2530;
+  --ink: #f2f5f8; --muted: #a8b6c2; --accent: #ffd9a0; --accent-strong: #ffb050; --legal: #9fe6a0; --danger: #e06060;
+  --line: rgba(255, 255, 255, 0.15); --border: rgba(255, 255, 255, 0.25);
+}
+* { box-sizing: border-box; }
+
+/* ------------------------------------------------------------- text */
+.text { color: var(--ink); font-size: 16px; }
+.muted { color: var(--muted); font-size: 16px; }
+.small { color: var(--muted); font-size: 14px; }
+.h1 { color: var(--accent); font-size: 32px; font-weight: 700; }
+.h1-small { color: var(--accent); font-size: 22px; font-weight: 700; }
+.tagline { color: var(--muted); font-size: 15px; }
+.profile { color: var(--muted); font-size: 13px; }
+.sync-synced { color: #7fce7f; font-size: 13px; }
+.sync-saving { color: var(--muted); font-size: 13px; }
+.sync-offline { color: var(--danger); font-size: 13px; }
+.h2 { color: var(--ink); font-size: 28px; font-weight: 700; }
+.h2-small { color: var(--ink); font-size: 20px; font-weight: 700; }
+.h3 { color: var(--accent); font-size: 18.7px; font-weight: 700; }
+.legend { color: var(--accent); font-size: 16px; }
+.objective { color: var(--accent); font-size: 17px; }
+.objective-small { color: var(--accent); font-size: 13px; }
+.turn { color: var(--muted); font-size: 15px; }
+.turn-small { color: var(--muted); font-size: 12px; }
+.suit-banner { color: var(--accent); font-size: 15px; }
+.headline { color: var(--accent); font-size: 30px; }
+.error-text { color: var(--danger); font-size: 16px; }
+.ach { color: var(--muted); font-size: 16px; }
+.ach-got { color: var(--accent); font-size: 16px; }
+.achievements { color: var(--accent-strong); font-size: 16px; font-weight: 600; }
+.mode-strong { color: var(--accent); font-size: 19px; font-weight: 700; }
+.mode-text { color: var(--ink); font-size: 15px; }
+.mode-em { color: var(--muted); font-size: 13px; }
+.stage-num { color: var(--accent); font-size: 18px; font-weight: 700; }
+.stage-text { color: var(--ink); font-size: 14px; }
+.stage-em { color: var(--muted); font-size: 12px; }
+.td { color: var(--ink); font-size: 16px; }
+.th { color: var(--ink); font-size: 16px; font-weight: 700; }
+.td-foot { color: var(--accent); font-size: 16px; font-weight: 700; }
+.caption { color: var(--muted); font-size: 16px; }
+.toast-text { color: var(--ink); font-size: 15px; text-align: center; }
+.tut-h { color: var(--accent); font-size: 18.7px; font-weight: 700; }
+.btn-label { color: var(--ink); font-size: 17px; }
+.btn-label-ink { color: #22160a; font-size: 17px; font-weight: 600; }
+.wrap { color: var(--ink); font-size: 15px; text-align: center; }
+.suit-glyph { font-size: 34px; text-align: center; }
+.suit-name { color: #222222; font-size: 15px; font-weight: 600; text-align: center; }
+
+/* ------------------------------------------------------------- buttons */
+.btn {
+  font-size: 17px; padding: 10px 22px; min-height: 44px; min-width: 44px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--ink);
+}
+.btn:hover { background: rgba(255, 255, 255, 0.16); }
+.btn:active { background: rgba(255, 255, 255, 0.22); }
+.btn:disabled { opacity: 0.45; }
+.btn-primary {
+  font-size: 17px; font-weight: 600; padding: 10px 22px; min-height: 44px; border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0); background: var(--accent-strong); color: #22160a;
+}
+.btn-primary:hover { background: var(--accent); }
+.btn-primary:disabled { opacity: 0.45; }
+.btn-big {
+  font-size: 24px; font-weight: 600; padding: 16px 56px; min-height: 44px; border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0); background: var(--accent-strong); color: #22160a;
+}
+.btn-big:hover { background: var(--accent); }
+.btn-ghost {
+  font-size: 17px; padding: 10px 22px; min-height: 44px; min-width: 44px; border-radius: 999px;
+  border: 1px solid var(--border); background: rgba(0, 0, 0, 0); color: var(--ink);
+}
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.16); }
+.btn-ghost:disabled { opacity: 0.45; }
+.btn-small {
+  font-size: 14px; padding: 6px 14px; min-height: 36px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--ink);
+}
+.btn-small:hover { background: rgba(255, 255, 255, 0.16); }
+.btn-small:disabled { opacity: 0.45; }
+.btn-danger {
+  font-size: 17px; padding: 10px 22px; min-height: 44px; border-radius: 999px;
+  border: 1px solid var(--danger); background: rgba(0, 0, 0, 0); color: var(--danger);
+}
+.btn-danger:hover { background: rgba(224, 96, 96, 0.15); }
+.btn-top {
+  font-size: 14px; padding: 6px 12px; min-height: 44px; min-width: 44px; border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0); background: #6f6f6f; color: #ffffff;
+}
+.btn-top:hover { background: #808080; }
+
+/* ------------------------------------------------------------- panels and cards */
+.mode-card {
+  padding: 18px; border-radius: 14px; background: var(--panel); border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--ink); min-height: 120px; text-align: start;
+}
+.mode-card:hover { background: rgba(255, 255, 255, 0.15); }
+.journey-stage {
+  padding: 12px; border-radius: 12px; min-height: 84px; background: var(--panel); border: 1px solid var(--line);
+  color: var(--ink); text-align: start;
+}
+.journey-stage:hover { background: rgba(255, 255, 255, 0.15); }
+.journey-stage:disabled { opacity: 0.4; }
+.journey-won {
+  padding: 12px; border-radius: 12px; min-height: 84px; background: var(--panel); border: 1px solid var(--accent-strong);
+  color: var(--ink); text-align: start;
+}
+.journey-won:hover { background: rgba(255, 255, 255, 0.15); }
+.hand-zone { background: var(--panel); border-radius: 14px; padding: 10px 14px; }
+.tutorial { border: 1px solid var(--accent-strong); border-radius: 12px; padding: 12px 16px; background: rgba(255, 176, 80, 0.1); }
+.fieldset { border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; padding: 12px 16px; }
+.article { background: var(--panel); border-radius: 12px; padding: 12px 16px; }
+.row-rule { border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 16px; }
+.toast { background: #1a2530; border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px; }
+.suit-btn {
+  padding: 18px; border-radius: 16px; background: #fdfdf8; border: 3px solid rgba(0, 0, 0, 0); color: #222222; min-width: 140px;
+}
+.suit-btn:hover { border: 3px solid var(--accent-strong); }
+.page { background: linear-gradient(180deg, #1c2733, #0e141b); border-radius: 0; }
+.kbd { background: rgba(255, 255, 255, 0.15); border-radius: 4px; padding: 1px 6px; color: var(--ink); font-size: 15px; }
+.btn-top-label { color: #ffffff; font-size: 14px; }

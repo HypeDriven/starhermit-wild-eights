@@ -1,0 +1,31 @@
+# A hosted table on the local platform, the host's side (alice, desktop):
+# Hosted Play, Host a table, wait for bob, Start round (two AI seats fill the
+# table), then play by keys (→ choose, Enter play, D draw; Enter declares the
+# focused best suit) to the result server.js records.
+# viewport 1280x720@1
+until 900 =Hosted Play
+frames 30
+click =Hosted Play
+until 300 =Host a table
+frames 10
+click =Host a table
+until 600 =Start round
+frames 10
+until 3000 2 seated
+frames 20
+save online-host-lobby
+click =Start round
+until 1200 (your turn)
+frames 30
+save online-host-play
+repeat 4000 until =Round over
+  key ArrowRight 1
+  frames 3
+  key Enter 1
+  frames 12
+  key KeyD 1
+  frames 25
+end
+frames 30
+save online-host-results
+expect result recorded by the StarHermit server

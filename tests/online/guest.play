@@ -1,0 +1,26 @@
+# A hosted table on the local platform, the guest's side (bob, desktop):
+# Hosted Play, Quick join alice's table, then play by keys to the result.
+# viewport 1280x720@1
+until 900 =Hosted Play
+frames 60
+click =Hosted Play
+until 300 =Quick join
+frames 10
+click =Quick join
+until 600 =Leave
+frames 10
+save online-guest-lobby
+until 3000 Hosted table
+frames 60
+save online-guest-play
+repeat 4000 until =Round over
+  key ArrowRight 1
+  frames 3
+  key Enter 1
+  frames 12
+  key KeyD 1
+  frames 25
+end
+frames 30
+save online-guest-results
+expect result recorded by the StarHermit server

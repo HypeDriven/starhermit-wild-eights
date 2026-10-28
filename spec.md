@@ -1,3 +1,78 @@
+# Wild Eights — running specification (StarHermit engine)
+
+Wild Eights is a StarHermit engine script game (engine 1.22.0, host API minor 24): one package
+(`native/main.ts` entry) played natively by the StarHermit client and in browsers through the
+engine's web runtime (`index.html` loader + `starhermit-files.json`, written by `npm run package`).
+
+## Game
+- Rules: `js/game.js` (deterministic, seeded): match the top discard by suit or rank; an 8 is wild
+  and its player declares the next suit; a blocked player draws up to 3 cards (a playable draw keeps
+  the turn); the first empty hand wins and scores the points left in the rivals' hands (8 = 50,
+  A = 15, faces 10, pips face value); a dead stock ends by fewest points.
+- Modes: Learn (four lessons, seed 1337, one Relaxed rival), Practice (1–3 rivals, Relaxed /
+  Regular / Expert, undo), Daily (one seed per UTC day from the platform clock, else the device's),
+  Journey (40 stages, each unlocked by the previous win, best moves kept), Challenges (four fixed
+  seeds, no undo), Hosted Play (below). The first Play runs Learn; later Play opens the modes.
+- Records: rounds played/won, best score, best streak, Daily days, seven local achievements, and
+  the `high-score` leaderboard's top ten.
+
+## Screens and controls
+- Title, modes, Journey, challenges, practice setup, hosted play, table, results, settings, help,
+  records; pause, suit-declaration and erase-progress dialogs. Every screen is linked from the title
+  or the modes. Phones in portrait stack HUD / lesson / table / hand; short landscape shows
+  HUD | table | hand; the page header is hidden there mid-round.
+- Table: the hand tray's card buttons (named "Q of clubs, playable") or the cards on the 3D table
+  (pointer or finger; scene taps are skipped while `ui.pointerCaptured()`), Draw, Hint, Undo
+  (Practice), Pause.
+- Keys (rebindable in Options): ←/→ choose a card, Enter/Space play it, D draw, H hint, U undo,
+  Esc pause / back, C reframe. Pad: D-pad / left stick choose, South play, West draw, North hint,
+  Select undo, East or Start pause, right stick press reframe.
+- Settings (game): table theme (five), colour-vision-safe card palette, left-handed tray, replay
+  tutorial, erase progress. Volumes, mute, graphics level, frame-rate limit, language, controls,
+  reduced motion, high contrast and text size are the runtime's Options (the Options buttons).
+
+## Look and sound
+- `native/render.ts` ports the old three.js r185 table one to one: the old page's light values
+  (minor 24: no ÷π), its shadow camera / bias values, `RoomEnvironment(renderer)` lowered by 3.5
+  (r183+) at `environmentIntensity` 0.3, bloom, GTAO, the linear colour grade, sparks and dust.
+  The four old presets map to the runtime's quality tiers (`native/quality.ts`).
+- `native/audio.ts`: the sfx/*.opus one-shots; the music stem and railway ambience rendered once
+  into looping clips (ambience on the music bus).
+
+## Platform
+- Save (`saves`, schema 1, `js/save.js`): journey, achievements, streaks, Daily days, records,
+  tutorial; merged on conflict; the browser build's cloud slot (`game:wild-eights`) migrates once
+  as the foreign save. Game options are engine settings; the old settings KV is imported once.
+- Solo rounds (every mode but Learn) post the round's score (0 when lost) through `server.js`'s
+  score-posting session, range-checked against BOARDS as the old score-script.js did.
+- Hosted Play (signed in): Host a table (4-seat room, join code), Quick join, Join by code, room
+  invites, invite friends; the host starts the round and the platform fills the empty seats with AI.
+  The round is a room-bound session refereed by `server.js` (built by `npm run server` from
+  `tools/server-head.js`, `js/game.js` and `tools/server-body.js`): server-side deal from
+  `ctx.random`, every move validated for the sender's own seat, each seat sent only its own hand,
+  AI seats played by the rules' Regular AI, a player who left handed to the AI, one offline 30 s
+  played by the AI until back; the session's `result` is the record. Clients never report results.
+
+## Checks
+- `npm test`: rules (`tests/rules.test.js`), server referee + score posting, save, i18n (nine
+  locales), server.js freshness, then `tests/native.mjs` (tsc, `starhermit check`, web index,
+  every `tests/native/*.play`: menus, Journey 1 won, Learn on a DPR-3 phone, short landscape by keys).
+- `npm run test:online`: two runtimes on `--dev --local-platform` (alice hosts, bob quick-joins)
+  play a hosted round to the server's result. `npm run test:browser`: the web package on the AMD
+  GPU at desktop, phone and landscape (DPR 3), a Daily round to the results.
+- `node tools/gen-plays.mjs` regenerates the solo play scripts from the rules.
+
+## Known limitations
+- The old browser-only dev host (`node server.js` WebSockets) is gone; hosted tables need the
+  StarHermit platform (or the runtime's local platform).
+- Guests' old browser localStorage progress cannot migrate; signed-in cloud saves do.
+- The graphics panel's per-effect overrides are not offered (Options choose a level).
+- Hosted results are not posted to the high-score board (as before).
+
+---
+
+# Original design specification (browser build)
+
 # Wild Eights — Product and Game Specification
 
 **Document status:** design specification only; no implementation is included.  

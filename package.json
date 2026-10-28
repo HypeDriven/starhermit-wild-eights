@@ -1,15 +1,17 @@
 {
   "name": "wild-eights",
-  "version": "1.0.0",
-  "description": "Wild Eights \u2014 railway-compartment card game (browser + authoritative host)",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Wild Eights — railway-compartment card game on the StarHermit engine",
   "scripts": {
-    "test": "node tests.js && node --test tests/gfx.test.js tests/platform.test.js tests/i18n.test.js",
-    "start": "node server.js",
-    "test:e2e": "node tests/e2e.mjs"
-  },
-  "dependencies": {
-    "three": "^0.185.1",
-    "ws": "^8.21.3"
+    "test": "npm run test:unit && npm run test:native",
+    "test:unit": "node tests/rules.test.js && node --test tests/server.test.mjs tests/save.test.mjs tests/i18n.test.mjs && node tools/build-server.mjs --check",
+    "test:native": "node tests/native.mjs",
+    "test:online": "node tools/online-play.mjs",
+    "test:browser": "node tools/browser-play.mjs .",
+    "server": "node tools/build-server.mjs",
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.62.1"
