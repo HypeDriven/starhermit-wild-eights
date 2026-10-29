@@ -4,7 +4,7 @@
     "cover.jpg": {"sha256": "8a0580772037203bc3f0babb8f38b4936ba867d348e7f1e883a332e2ce434692", "size": 153188},
     "favicon.png": {"sha256": "6d06f07a51d181bb78f81377f12eb835f0baf259cfc52ff4ff66834d37a4ea16", "size": 112150},
     "icon.png": {"sha256": "f345edd0f7b52ca83c191313028ddbf4e2196778689fc155c86cebfc6b1f12a7", "size": 10553},
-    "index.html": {"sha256": "8cf528579b8145dd82afd56562a916fc9c7ea20f6f50a59177f677a23ae3d39c", "size": 1761},
+    "index.html": {"sha256": "0630219b196978c542731e4ec5329b50e107c3dc4fc994f12e16252fc9b6ae0f", "size": 1761},
     "js/content.js": {"sha256": "98b4b9b309bfa7d7198243e12c27a7a8feac89dc6407766370d22104d4655119", "size": 6586},
     "js/game.js": {"sha256": "45153163fa13cd7e43b35875fbef9c6b764d9da9fa48b6de9f7b67b2122bac84", "size": 17399},
     "js/i18n.js": {"sha256": "dd729c696e19e3d6a5e7c485d258f485512f5596cedffa4dddfbadd277cd5ec2", "size": 2911},
@@ -34,7 +34,7 @@
     "sfx/ui-select-tick.opus": {"sha256": "73b56f6d3a7e4a5f69c51ad4bc02d468f2e31bee6dd9c56bdd579f1210230677", "size": 11318},
     "sfx/victory-fanfare.opus": {"sha256": "04cdc7d7a24a427df5e4b0b664968f1ce4511ddde4fae90f5adb1ecaa01bb60e", "size": 40679},
     "sfx/wild-eight-chime.opus": {"sha256": "0665cba157f2e2e76811440f3d980f1bb219571c17855666f59d7e5057292046", "size": 27827},
-    "starhermit.txt": {"sha256": "c45238fb560215fc05e2076a6e8b3835e95776e75237378ca87a8726fb881c2c", "size": 1762}
+    "starhermit.txt": {"sha256": "fee87b248ce80cf2567735f881219a9eaaaa0cfe0a244c114b462399c7a34395", "size": 1762}
   },
   "excluded": ["LICENSE.md", "coverart.png", "favicon.svg", "node_modules/", "package.json", "sfx/manifest.json", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
