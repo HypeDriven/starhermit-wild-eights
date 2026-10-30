@@ -1,6 +1,6 @@
 # Wild Eights — running specification (StarHermit engine)
 
-Wild Eights is a StarHermit engine script game (engine 1.28.0, host API minor 30): one package
+Wild Eights is a StarHermit engine script game (engine 1.29.0, host API minor 31): one package
 (`native/main.ts` entry) played natively by the StarHermit client and in browsers through the
 engine's web runtime (`index.html` loader + `starhermit-files.json`, written by `npm run package`).
 
@@ -34,7 +34,7 @@ engine's web runtime (`index.html` loader + `starhermit-files.json`, written by 
 ## Look and sound
 - `native/render.ts` ports the old three.js r185 table one to one: the old page's light values
   (minor 24: no ÷π), its shadow camera / bias values, `RoomEnvironment(renderer)` lowered by 3.5
-  (r183+) at `environmentIntensity` 0.3, bloom, GTAO, the linear colour grade (over-range light kept, minor 30), sparks and dust.
+  (r183+) at `environmentIntensity` 0.3, bloom, GTAO, the linear colour grade (over-range light kept, minor 31), sparks and dust.
   The four old presets map to the runtime's quality tiers (`native/quality.ts`).
 - `native/audio.ts`: the sfx/*.opus one-shots; the music stem and railway ambience rendered once
   into looping clips (ambience on the music bus).
