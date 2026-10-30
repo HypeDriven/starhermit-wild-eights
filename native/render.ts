@@ -466,7 +466,7 @@ function applyPost(): void {
   renderer.grade = q.grade ? {
     space: "linear", overRange: "keep", // minor 29: mix(c, s + max(c - 1, 0), amount) as the page's GradeShader
     contrast: 0.22, saturation: 1.1, shadows: [0.95, 0.98, 1.05], highlights: [1.05, 1, 0.94], split: [0.15, 0.8],
-    vignette: { amount: 0.28, inner: 0.6, outer: 1.6, scale: [1, 0.9] },
+    vignette: { amount: 0.28, inner: 0.3, outer: 0.8, scale: [1, 0.9] },
   } : null;
 }
 
