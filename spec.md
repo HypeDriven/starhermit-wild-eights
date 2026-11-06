@@ -35,7 +35,7 @@ engine's web runtime (`index.html` loader + `starhermit-files.json`, written by 
 - `native/render.ts` ports the old three.js r185 table one to one: the old page's light values
   (minor 24: no ÷π), its shadow camera / bias values, `RoomEnvironment(renderer)` lowered by 3.5
   (r183+) at `environmentIntensity` 0.3, bloom, GTAO, the linear colour grade (over-range light kept, minor 31), sparks and dust.
-  The four old presets map to the runtime's quality tiers (`native/quality.ts`).
+  The four old presets' art maps to the runtime's quality tiers (`native/quality.ts`); shadows, AO, bloom, grade and anti-aliasing are the engine's level settings (`levelSettings()`; Low has no anti-aliasing).
 - `native/audio.ts`: the sfx/*.opus one-shots; the music stem and railway ambience rendered once
   into looping clips (ambience on the music bus).
 

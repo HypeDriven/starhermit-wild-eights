@@ -21,7 +21,7 @@
 //   js/online.js (`adapter`).
 import type { JsonValue } from "starhermit:engine";
 import {
-  connectGame, friends, inviteLink as fetchInviteLink, leaderboards, onPlayerChange, player, rooms, serverNow, serverTime, sessions,
+  connectGame, friends, inviteLink as fetchInviteLink, leaderboards, onPlayerChange, player, rooms, serverNow, serverTime,
   type GameSocket, type Leaderboard, type Room, type RoomSocket,
 } from "starhermit:platform";
 import { saves, settings as store } from "starhermit:storage";
@@ -167,41 +167,10 @@ async function highScoreBoard(): Promise<Leaderboard | null> {
 export interface Posted { posted: boolean; rank: number | null }
 /** Signed in only: post a finished round's score through server.js; { posted, rank }. Never rejects. */
 export async function postScore(total: number): Promise<Posted> {
-  const me = player();
-  if (!me) return { posted: false, rank: null };
-  const score = Math.max(0, Math.round(total));
-  let accepted: string[] = [];
   try {
-    const sessionId = await sessions.practice();
-    accepted = await new Promise<string[]>((resolve) => {
-      const socket = connectGame(sessionId);
-      let done = false;
-      const finish = (list: string[]): void => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        socket.close();
-        resolve(list);
-      };
-      const timer = setTimeout(() => finish([]), 15000);
-      socket.on("open", () => { socket.sendCommand({ type: "result", scores: { "high-score": score } }); });
-      socket.on("game", (d) => {
-        const m = d as { type?: string; accepted?: string[] } | null;
-        if (m && m.type === "result-ack") finish(Array.isArray(m.accepted) ? m.accepted : []);
-      });
-      socket.on("error", () => finish([]));
-      socket.on("stopped", () => finish([]));
-      socket.on("abandoned", () => finish([]));
-    });
+    const r = await leaderboards.submitScore("high-score", Math.max(0, Math.round(total)));
+    return { posted: r.accepted, rank: r.rank };
   } catch { return { posted: false, rank: null }; }
-  if (!accepted.includes("high-score")) return { posted: false, rank: null };
-  try {
-    const b = await highScoreBoard();
-    if (!b) return { posted: true, rank: null };
-    const r = await leaderboards.entries(b.id, { pageSize: 100 });
-    const mine = r.items.find((e) => e.userId === me.userId);
-    return { posted: true, rank: mine ? mine.rank : null };
-  } catch { return { posted: true, rank: null }; }
 }
 export interface BoardRow { rank: number; name: string; score: number; me: boolean }
 /** Records: the top ten of the high-score board (guests read it too). */

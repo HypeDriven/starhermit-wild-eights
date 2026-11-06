@@ -3,13 +3,14 @@
 // eight with the suit most held, else Draw) simulated with js/game.js against
 // the same deterministic rivals the game runs, so every click lands.
 //   node tools/gen-plays.mjs
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const W = require('../js/game.js');
 const C = require('../js/content.js');
-const I = require('../js/i18n.js');
-I.setLocale('en-US');
+const EN = JSON.parse(readFileSync(new URL('../assets/strings.json', import.meta.url), 'utf8'))['en-US'];
+const suitName = (s) => EN['suit_' + s];
+const cardName = (c, rankName) => EN.cardOf.replace('{rank}', rankName(c.rank)).replace('{suit}', suitName(c.suit));
 
 /** The player's moves for a round, as play-script lines: `tap` clicks or touches cards by name; "keys" selects with →, plays with Enter, draws with D. */
 export function roundLines(seed, opts, tap, choose = (plays) => plays.find((c) => c.rank !== 8) || plays[0]) {
@@ -36,13 +37,13 @@ export function roundLines(seed, opts, tap, choose = (plays) => plays.find((c) =
         const idx = hand.indexOf(pick);
         for (let k = 0; k <= idx; k++) out.push('key ArrowRight 1', 'frames 3');
         out.push('key Enter 1', 'frames 10');
-      } else out.push(`${tap} =${I.cardName(pick, W.rankName)}, playable`, 'frames 10');
+      } else out.push(`${tap} =${cardName(pick, W.rankName)}, playable`, 'frames 10');
       W.applyCommand(st, { type: 'play', cardId: pick.id });
       if (st.pendingSuitFor === 0) {
         const counts = { hearts: 0, diamonds: 0, clubs: 0, spades: 0 };
         for (const c of st.hands[0]) counts[c.suit]++;
         const suit = W.SUITS.slice().sort((a, b) => counts[b] - counts[a])[0];
-        out.push('until 300 =Declare a suit', 'frames 10', tap === 'keys' ? 'key Enter 1' : `${tap} =${I.suitName(suit)} (${counts[suit]})`, 'frames 10');
+        out.push('until 300 =Declare a suit', 'frames 10', tap === 'keys' ? 'key Enter 1' : `${tap} =${suitName(suit)} (${counts[suit]})`, 'frames 10');
         W.applyCommand(st, { type: 'declareSuit', suit });
       }
     }

@@ -8,9 +8,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const STRINGS = require('../js/strings.js');
+const STRINGS = JSON.parse(readFileSync(new URL('../assets/strings.json', import.meta.url), 'utf8'));
 const C = require('../js/content.js');
-const I = require('../js/i18n.js');
 const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'];
 const en = STRINGS['en-US'];
 const dir = new URL('../native/', import.meta.url);
@@ -36,30 +35,23 @@ for (const loc of LOCALES) {
   });
   test(`${loc}: every content name`, () => {
     const L = STRINGS[loc];
-    for (const t of C.THEMES) assert.ok(L.themes[t.id], `theme ${t.id}`);
-    for (const c of C.CHALLENGES) assert.equal(L.challenges[c.id]?.length, 2, `challenge ${c.id}`);
-    for (const t of C.TUTORIAL) assert.equal(L.tutorial[t.id]?.length, 2, `lesson ${t.id}`);
-    for (const a of C.ACHIEVEMENTS) assert.equal(L.achievements[a.id]?.length, 2, `achievement ${a.id}`);
+    for (const t of C.THEMES) assert.ok(L[`themes.${t.id}`], `theme ${t.id}`);
+    for (const c of C.CHALLENGES) assert.ok(L[`challenges.${c.id}.0`] && L[`challenges.${c.id}.1`], `challenge ${c.id}`);
+    for (const t of C.TUTORIAL) assert.ok(L[`tutorial.${t.id}.0`] && L[`tutorial.${t.id}.1`], `lesson ${t.id}`);
+    for (const a of C.ACHIEVEMENTS) assert.ok(L[`achievements.${a.id}.0`] && L[`achievements.${a.id}.1`], `achievement ${a.id}`);
   });
 }
 test('English content strings match the authored data', () => {
-  for (const t of C.THEMES) assert.equal(en.themes[t.id], t.name);
-  for (const c of C.CHALLENGES) assert.deepEqual(en.challenges[c.id], [c.name, c.desc]);
-  for (const t of C.TUTORIAL) assert.deepEqual(en.tutorial[t.id], [t.title, t.body]);
-  for (const a of C.ACHIEVEMENTS) assert.deepEqual(en.achievements[a.id], [a.name, a.desc]);
-  I.setLocale('en-US');
-  for (const s of C.JOURNEY) assert.equal(I.stageName(s), s.name, s.id);
+  for (const t of C.THEMES) assert.equal(en[`themes.${t.id}`], t.name);
+  for (const c of C.CHALLENGES) assert.deepEqual([en[`challenges.${c.id}.0`], en[`challenges.${c.id}.1`]], [c.name, c.desc]);
+  for (const t of C.TUTORIAL) assert.deepEqual([en[`tutorial.${t.id}.0`], en[`tutorial.${t.id}.1`]], [t.title, t.body]);
+  for (const a of C.ACHIEVEMENTS) assert.deepEqual([en[`achievements.${a.id}.0`], en[`achievements.${a.id}.1`]], [a.name, a.desc]);
+  const stageName = ({ index: n }) => (n <= 8 ? en.stage_local.replace('{n}', n) : n <= 16 ? en.stage_regional.replace('{n}', n) : n <= 28 ? en.stage_intercity.replace('{n}', n) : n <= 36 ? en.stage_express.replace('{n}', n) : en.stage_mastery.replace('{n}', n - 36));
+  for (const s of C.JOURNEY) assert.equal(stageName(s), s.name, s.id);
 });
 test('non-English locales are translated', () => {
   for (const loc of LOCALES.filter((l) => !l.startsWith('en'))) {
-    const same = [...used].filter((k) => STRINGS[loc][k] === en[k] && !/^(opponentCount|suitOption|cardOf|optionsBtn|appearance|lbRank|stage_\w+)$/.test(k));
+    const same = [...used].filter((k) => STRINGS[loc][k] === en[k] && !/^(opponentCount|suitOption|cardOf|optionsBtn|appearance|stage_\w+)$/.test(k));
     assert.ok(same.length < 15, `${loc}: ${same.join(', ')}`);
   }
-});
-test('locale matching follows the runtime language', () => {
-  assert.equal(I.match('de'), 'de-DE');
-  assert.equal(I.match('es-MX'), 'es-419');
-  assert.equal(I.match('fr-CA'), 'fr-CA');
-  assert.equal(I.match('pt'), 'pt-BR');
-  assert.equal(I.match('xx'), 'en-US');
 });

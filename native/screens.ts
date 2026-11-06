@@ -15,7 +15,7 @@ import { frame, openMenu } from "starhermit:engine";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
 import { C, W, type Card, type Suit } from "./game.ts";
-import { L, T, TN } from "./i18n.ts";
+import { L, S, T, TN } from "./i18n.ts";
 import * as platform from "./platform.ts";
 import {
   achievementName, acceptInvite, app, back, canUndo, cardName, closeDialog, currentLesson, declare, drawCard, fresh, hint, hostTable, hostedLeave,
@@ -27,13 +27,11 @@ import {
 
 interface Layout { lw: number; lh: number; sc: number; ox: number; oy: number; portrait: boolean; short: boolean; side: number; inner: number }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const lw = Math.max(1, v.width), lh = Math.max(1, v.height);
   const side = lw < 1024 ? 12 : Math.min(40, Math.max(8, lw * 0.03));
   const inner = Math.min(1200, lw) - 2 * side;
-  return { lw, lh, sc, ox: sa.left, oy: sa.top, portrait: lw <= 640 && lh >= lw, short: lh <= 500 && lw > lh, side, inner };
+  return { lw, lh, sc: v.scale, ox: v.x, oy: v.y, portrait: lw <= 640 && lh >= lw, short: lh <= 500 && lw > lh, side, inner };
 }
 function tw(text: string, style: string, kind?: "button" | "heading"): number {
   return ui.measureText(text, { ...(kind ? { kind } : {}), style: [style] }).width / ui.preferences().scale;
@@ -69,18 +67,12 @@ function button(b: Btn): void {
 }
 /** Buttons at their own widths in rows wrapping at `width` (flex-wrap). */
 function flow(label: string, list: Btn[], width: number, gap = 12, justify: "start" | "center" = "start"): void {
-  const rows: Btn[][] = [[]];
-  let used = 0;
-  const bw = (b: Btn): number => Math.min(width, b.width ?? btnWidth(b));
-  for (const b of list) {
-    const w = bw(b);
-    if (rows[rows.length - 1]!.length && used + gap + w > width) { rows.push([]); used = 0; }
-    used += (rows[rows.length - 1]!.length ? gap : 0) + w;
-    rows[rows.length - 1]!.push(b);
-  }
-  ui.column(label, () => {
-    rows.forEach((row, ri) => ui.row(`${label}-r${ri}`, () => { for (const b of row) button({ ...b, width: bw(b) }); }, { spacing: gap, width, justify, align: "center" }));
-  }, { spacing: gap, width, align: justify === "center" ? "center" : "start" });
+  ui.row(label, () => {
+    for (const b of list) {
+      const w = b.width ?? (btnWidth(b) > width ? width : null);
+      button(w === null ? b : { ...b, width: Math.min(width, w) });
+    }
+  }, { wrap: true, width, gap, justify, align: "center" });
 }
 /** CSS grid repeat(auto-fit, minmax(min, 1fr)). */
 function gridOf<X>(label: string, items: X[], width: number, min: number, gap: number, cell: (item: X, w: number, i: number) => void): void {
@@ -209,8 +201,8 @@ function titleScreen(L0: Layout, w: number): void {
       { id: "btn-records", text: T("records"), style: "btn-ghost", act: () => show("records") }],
   ];
   const acct: Btn[] = [];
-  if (!platform.signedIn()) acct.push({ id: "btn-signin", text: T("signIn"), style: "btn-ghost", act: signIn });
-  else if (platform.inviteLink()) acct.push({ id: "btn-invite", text: T("invite"), style: "btn-ghost", act: invite });
+  if (!platform.signedIn()) acct.push({ id: "btn-signin", text: S("signIn"), style: "btn-ghost", act: signIn });
+  else if (platform.inviteLink()) acct.push({ id: "btn-invite", text: S("invite"), style: "btn-ghost", act: invite });
   if (acct.length) rows.push(acct);
   rows.forEach((r, i) => flow(`title-row-${i}`, r, w, 12, "center"));
   const doc = platform.progress();
@@ -282,7 +274,7 @@ function hostedScreen(w: number): void {
   heading(T("hostedH"), w);
   if (!platform.signedIn()) {
     para(T("hostedSignIn"), w, "muted");
-    flow("hosted-signin", [{ id: "btn-hosted-signin", text: T("signIn"), style: "btn-primary", act: signIn }], w);
+    flow("hosted-signin", [{ id: "btn-hosted-signin", text: S("signIn"), style: "btn-primary", act: signIn }], w);
   } else if (!H.lobby) {
     para(T("hostedText"), Math.min(w, 700), "muted");
     flow("hosted-join", [
@@ -305,7 +297,7 @@ function hostedScreen(w: number): void {
     for (const [i, line] of rosterLines().entries()) para(`• ${line}`, w, "text", `lobby-p${i}`);
     const list: Btn[] = [];
     if (lobby.host) list.push({ id: "btn-start-hosted", text: T("startRound"), style: "btn-primary", act: hostedStart, disabled: lobby.starting || !!H.table });
-    if (lobby.host) list.push({ id: "btn-invite-friend", text: T("invite"), style: "btn-ghost", act: showFriends });
+    if (lobby.host) list.push({ id: "btn-invite-friend", text: S("invite"), style: "btn-ghost", act: showFriends });
     list.push({ id: "btn-leave-hosted", text: T("leave"), style: "btn-ghost", act: () => { hostedLeave(); app.hosted.status = { key: "leftTable" }; } });
     flow("lobby-actions", list, w);
     if (H.friends) {
@@ -342,7 +334,7 @@ function resultsScreen(w: number): void {
   }, { width: tw0, spacing: 0 });
   para(r.extra, w, "muted", "results-extra");
   const lb = app.lb;
-  if (lb) para(lb === "posting" ? T("lbPosting") : !lb.posted ? T("lbNotPosted") : lb.rank ? T("lbRank", { rank: lb.rank }) : T("lbPosted"), w, "muted", "results-lb");
+  if (lb) para(lb === "posting" ? S("leaderboardPosting") : !lb.posted ? S("leaderboardNotPosted") : lb.rank ? S("leaderboardRank", { rank: lb.rank }) : S("leaderboardPosted"), w, "muted", "results-lb");
   if (r.unlocked.length) para(T("unlockedList", { list: r.unlocked.map(achievementName).join(", ") }), w, "achievements");
   const list: Btn[] = [{ id: "btn-again", text: r.hosted ? T("hostedPlay") : T("playAgain"), style: "btn-primary", act: playAgain }];
   if (r.nextStage) list.push({ id: "btn-next-stage", text: T("nextStage"), act: nextStage });

@@ -14,13 +14,13 @@
 //
 // Time is the runtime's fixed steps (60 a second): delays (the results
 // screen after a round) run on a clock advanced 1000/60 ms per step.
-import { clipboard, frame, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
+import { afterRender, clipboard, createTimers, frame, levelSettings, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
 import { bindings, onAction, onPointerButton, onPointerMove, onTouch } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn, type Room } from "starhermit:platform";
 import { C, Online, Sv, W, type Card, type Challenge, type Cmd, type GameEvent, type Lobby, type Snap, type Stage, type State, type Suit, type Table } from "./game.ts";
 import * as audio from "./audio.ts";
-import { L, T, TN, type Vars } from "./i18n.ts";
+import { L, S, T, TN, type Vars } from "./i18n.ts";
 import * as platform from "./platform.ts";
 import { lookFor } from "./quality.ts";
 import * as render from "./render.ts";
@@ -66,16 +66,8 @@ export const nowMs = (): number => clockMs;
 export const fresh = (): boolean => frame().frame !== app.openedFrame;
 
 // ------------------------------------------------------------------ the fixed-step timers
-const timerList: { at: number; fn: () => void }[] = [];
-export function after(ms: number, fn: () => void): void { timerList.push({ at: clockMs + Math.max(0, ms), fn }); }
-function runTimers(): void {
-  for (let i = 0; i < timerList.length; i++) {
-    if (timerList[i]!.at > clockMs) continue;
-    const t = timerList.splice(i, 1)[0]!;
-    i--;
-    t.fn();
-  }
-}
+const timers = createTimers!();
+export function after(ms: number, fn: () => void): void { timers.after(Math.max(0, ms) / 1000, fn); }
 
 // ------------------------------------------------------------------ helpers
 const spoken: string[] = [];
@@ -92,9 +84,8 @@ export function toast(text: string): void {
   if (app.toasts.length > 3) app.toasts.shift();
   announce(text);
 }
-const pending: (() => void)[] = [];
-/** A widget's press, run once the frame's UI is built. */
-export function later(fn: () => void): void { pending.push(fn); }
+/** A widget's press, run once the frame's UI is built, before the scene is drawn. */
+export function later(fn: () => void): void { afterRender(fn); }
 export const reducedMotion = (): boolean => preferences().reducedMotion;
 export function msgText(m: Msg | null): string { return !m ? "" : m.raw != null ? m.raw : T(m.key, m.vars); }
 export const suitGlyph = (suit: string): string => ({ hearts: "♥", diamonds: "♦", clubs: "♣", spades: "♠" } as Record<string, string>)[suit] ?? suit;
@@ -696,7 +687,7 @@ export function signIn(): void { void requestSignIn().catch(() => undefined); }
 export function invite(): void {
   const link = platform.inviteLink();
   if (!link) return;
-  try { clipboard.writeText(link); toast(T("inviteCopied")); } catch { toast(T("inviteFailed", { link })); }
+  try { clipboard.writeText(link); toast(S("inviteCopied")); } catch { toast(S("inviteLink", { link })); }
 }
 export function wipeProgress(): void { platform.wipe(); closeDialog(); announce(T("wiped")); }
 
@@ -705,17 +696,16 @@ let hidden = false;
 onFixedUpdate(() => {
   if (hidden) return;
   clockMs += 1000 / 60;
-  runTimers();
+  timers.advance(1 / 60);
   if (platform.signedIn() && app.screen === "hosted" && !app.hosted.lobby && clockMs - invitePoll > 5000) { invitePoll = clockMs; void refreshInvites(); }
   app.hosted.table?.flush();
 });
-let lookKey = "";
+let lookKey: string | null = null;
 function applyLook(): void {
   const f = frame();
-  const k = `${f.quality}:${f.levelIndex}`;
-  if (k === lookKey) return;
-  lookKey = k;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  if (f.level === lookKey) return;
+  lookKey = f.level;
+  render.applyLook(lookFor(levelSettings(f.level)));
 }
 export function themeNow() { return C.THEMES.find((t) => t.id === platform.options.theme) ?? C.THEMES[0]!; }
 function applyOptions(): void {
@@ -735,7 +725,7 @@ onStart(() => {
 onPreferencesChange((p) => render.setReducedMotion(p.reducedMotion));
 platform.onOptionsChange(applyOptions);
 platform.onProgressMerged(() => undefined);
-onSessionEnded(() => toast(T("signedOut")));
+onSessionEnded(() => toast(S("signedOut")));
 onSuspend(() => {
   hidden = true;
   audio.setMusic(false);
@@ -757,8 +747,9 @@ onRender(() => {
   const f = frame();
   const rect = drawScreens();
   render.setView(rect, f.width, f.height);
-  for (const fn of pending.splice(0)) fn();
-  pointerInput(wasPlaying);
-  render.frame(frameDt);
-  flushAnnouncements();
+  afterRender(() => { // after the frame's presses (added earlier), as the old queue ran, before the scene is drawn
+    pointerInput(wasPlaying);
+    render.frame(frameDt);
+    flushAnnouncements();
+  });
 });

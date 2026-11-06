@@ -457,10 +457,11 @@ scene.environmentIntensity = 0.3;
 function applyPost(): void {
   if (!q) return;
   renderer.antialias = q.antialias;
-  renderer.bloom = q.bloom ? { strength: 0.45, radius: 0.4, threshold: 1.35, resolution: q.budget.bloomRes } : null;
-  renderer.ao = q.ao === "off" ? null : {
-    blendIntensity: 0.75, radius: 0.45, distanceExponent: 1.4, thickness: 0.6, scale: 1, samples: q.ao === "high" ? 16 : 8, resolution: q.budget.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: q.ao === "high" ? 6 : 4, rings: 2, samples: q.ao === "high" ? 16 : 8, radiusExponent: 2 },
+  renderer.bloom = q.bloom === null ? null : { strength: 0.45, radius: 0.4, threshold: 1.35, resolution: q.bloom };
+  const ao = q.ao, fullAo = !!ao && ao.resolution >= 1; // the engine's AO "high" is full resolution
+  renderer.ao = ao && {
+    blendIntensity: 0.75, radius: 0.45, distanceExponent: 1.4, thickness: 0.6, scale: 1, samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: fullAo ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // the old grade pass ran on the linear frame before the output's tone mapping
   renderer.grade = q.grade ? {
@@ -477,7 +478,7 @@ export function applyLook(look: Look): void {
   q = look;
   renderer.shadowMap.enabled = look.shadows > 0;
   keyLight.castShadow = look.shadows > 0;
-  if (look.shadows > 0) keyLight.shadow.mapSize = look.shadows;
+  if (look.shadows > 0) keyLight.shadow.mapSize = look.shadows; // the level's size: at minor 23+ the engine keeps the game's
   applyReflections();
   applyPost();
   const budgetChanged = prevBudget !== JSON.stringify(look.budget);
