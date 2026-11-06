@@ -5,7 +5,7 @@
     "cover.jpg": {"sha256": "8a0580772037203bc3f0babb8f38b4936ba867d348e7f1e883a332e2ce434692", "size": 153188},
     "favicon.png": {"sha256": "6d06f07a51d181bb78f81377f12eb835f0baf259cfc52ff4ff66834d37a4ea16", "size": 112150},
     "icon.png": {"sha256": "f345edd0f7b52ca83c191313028ddbf4e2196778689fc155c86cebfc6b1f12a7", "size": 10553},
-    "index.html": {"sha256": "e1f869572605e365a1db1dddbbe56a727d3d8263884de6e4e498fbbe28344484", "size": 1939},
+    "index.html": {"sha256": "2af2ed86db992a522452a3321867fd83762e7bb60e2fab25b1c429088f73e133", "size": 1939},
     "js/content.js": {"sha256": "98b4b9b309bfa7d7198243e12c27a7a8feac89dc6407766370d22104d4655119", "size": 6586},
     "js/game.js": {"sha256": "45153163fa13cd7e43b35875fbef9c6b764d9da9fa48b6de9f7b67b2122bac84", "size": 17399},
     "js/online.js": {"sha256": "b1ba94d9ca24fddca19eafe2463e6f39bad325fb24089aca6bfb8b823a3ab8a8", "size": 9092},
@@ -33,7 +33,7 @@
     "sfx/ui-select-tick.opus": {"sha256": "73b56f6d3a7e4a5f69c51ad4bc02d468f2e31bee6dd9c56bdd579f1210230677", "size": 11318},
     "sfx/victory-fanfare.opus": {"sha256": "04cdc7d7a24a427df5e4b0b664968f1ce4511ddde4fae90f5adb1ecaa01bb60e", "size": 40679},
     "sfx/wild-eight-chime.opus": {"sha256": "0665cba157f2e2e76811440f3d980f1bb219571c17855666f59d7e5057292046", "size": 27827},
-    "starhermit.txt": {"sha256": "457c32e6dd9473535f9fa046831a9c90bed651f4ee6aa3698f4bc469ce53ad79", "size": 1762}
+    "starhermit.txt": {"sha256": "cdec3707f6aaff18a0d05498d56daad7c2e4cf76499b122b1dbc554677bcd35e", "size": 1762}
   },
   "excluded": ["LICENSE.md", "coverart.png", "favicon.svg", "node_modules/", "package.json", "sfx/manifest.json", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
