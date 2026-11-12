@@ -1,0 +1,98 @@
+{
+  "game": {
+    "id": "061a0c6d-56a7-4494-a45a-4fbfdddda49a",
+    "displayName": "Wild Eights",
+    "hosting": {
+      "hostingEnabled": true,
+      "hostedUrl": "https://061a0c6d-56a7-4494-a45a-4fbfdddda49a.starhermit.com/index.html",
+      "deployStatus": "live",
+      "pinnedCommitSha": null,
+      "deployedCommitSha": null,
+      "deployError": null,
+      "deployedAt": "2026-11-12T08:19:01.353979+00:00",
+      "externalLaunchUrl": null,
+      "engineVersion": "1.38.0",
+      "deployWarning": null
+    }
+  },
+  "publishedAt": "2026-11-12T08:19:04.700Z",
+  "sourceCommit": "72e9c3fe569dcc578f6ccee8844a1e548af7029d",
+  "bytesReceived": 1522785,
+  "archiveSha256": "f25df116fa5399abb64b0516e427033e35f85bbdfe6b5f4ece81247d50c2f247",
+  "indexSha256": "b2ddb2e1d38314417ac7a59180c6aae0087ef5da33fa3dcdd20e906c4c5c7465",
+  "result": {
+    "clientPublished": true,
+    "serverImageLoaded": false,
+    "imageDigest": null,
+    "bytesReceived": 1522785,
+    "mode": "replace",
+    "filesRemoved": 0,
+    "engineVersion": "1.38.0",
+    "deployWarning": null
+  },
+  "liveVerification": {
+    "at": "2026-11-12T08:19:04.700Z",
+    "files": [
+      {
+        "file": "starhermit-files.json",
+        "sha256": "b2ddb2e1d38314417ac7a59180c6aae0087ef5da33fa3dcdd20e906c4c5c7465",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Japanese.otf",
+        "sha256": "2a8b85e2ffa11ac37e5f954a8d1283f2a6dcabbfa2cb860a8766a1f176d1f218",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Khmer.ttf",
+        "sha256": "4e09c038702d5a61b0c7f30fd78ff16f82fab8ab9e6df50d6b138793e1e29a48",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/SimplifiedChinese.otf",
+        "sha256": "4e84a51dbf542567cbbb84df080a897ffad80895007b0fb2b8370e26566e10da",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Tamil.ttf",
+        "sha256": "003be1a54e7ed0f942aff4be3af93773573daaf086fb38e8bd8b4a2fe0790620",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/TraditionalChinese.otf",
+        "sha256": "ab03e62de8f71f431bb8f070f9421663623981b46235542ff53660ab8669887e",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/common.json",
+        "sha256": "de39298858f6c897024d1df4f3cb41537939539336944508b0995b795da45b8d",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/fonts.json",
+        "sha256": "37beaea0dba54c9f2c45995cbf9fd19fad21719d701718c41d7e58dd7748ca13",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/locales.json",
+        "sha256": "8e56b316d1229ee39e4c9e4b9e4290c9aaeb85fac4b4a7097edae005c09d0abf",
+        "status": 200
+      },
+      {
+        "file": "assets/strings.json",
+        "sha256": "e3b144c14b850face7273a54c72a1a91b2e5389af5a8fc6a73146380ffaad27f",
+        "status": 200
+      },
+      {
+        "file": "index.html",
+        "sha256": "2af2ed86db992a522452a3321867fd83762e7bb60e2fab25b1c429088f73e133",
+        "status": 200
+      },
+      {
+        "file": "starhermit.txt",
+        "sha256": "da40b98097078b79d9acf50d4977a68fbd851fdd97b7d9882f4e5ff78d4b0099",
+        "status": 200
+      }
+    ]
+  }
+}
