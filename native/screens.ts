@@ -1,3 +1,7 @@
+import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
+import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
+// localization-runtime:attached
+import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
 // The browser build's DOM shell (index.html + styles.css) as starhermit:ui,
 // built every frame: the top bar (title, tagline, the player's name, the
 // cloud line, How to play and the runtime's Options in place of the old
@@ -11,7 +15,20 @@
 // picker, pause and erase confirmations are dialogs. The old media queries
 // are layouts picked by the window's logical size (portrait phones, short
 // landscape: HUD | table | hand).
-import { frame, openMenu } from "starhermit:engine";
+// The browser build's DOM shell (index.html + styles.css) as starhermit:ui,
+// built every frame: the top bar (title, tagline, the player's name, the
+// cloud line, How to play and the runtime's Options in place of the old
+// Sound toggle), every screen (title with its card fan, modes, Journey,
+// challenges, practice setup, hosted play, results, settings, help, records)
+// in a scrolling column of the old page's width, and the game screen: the HUD
+// (objective, turn line, Hint / Undo / Pause), the lesson panel, the table
+// (the rectangle left for render.ts) and the hand tray (active suit, the hand
+// as card buttons — the accessible mirror of the table — Draw and the rivals'
+// counts; Draw goes to the other side for left-handed play). The suit
+// picker, pause and erase confirmations are dialogs. The old media queries
+// are layouts picked by the window's logical size (portrait phones, short
+// landscape: HUD | table | hand).
+import { frame } from "starhermit:engine";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
 import { C, W, type Card, type Suit } from "./game.ts";
@@ -38,7 +55,7 @@ function tw(text: string, style: string, kind?: "button" | "heading"): number {
 }
 function para(text: string, width: number, cls = "text", id?: string): void {
   if (!text) return;
-  let u = ui.style(cls);
+  let u = ui.style(__l10nStyle(cls));
   if (id) u = u.id(id);
   if (tw(text, cls) <= width) u.label(text);
   else u.paragraph(text, Math.max(20, width));
@@ -58,12 +75,12 @@ function button(b: Btn): void {
     const lines = b.lines, inner = (b.width ?? 200) - 38;
     opts.content = () => { for (const l of lines) para(l.text, inner, l.cls); };
   } else if (b.name && b.name !== b.text) {
-    opts.content = () => { ui.style(style === "btn-top" ? "btn-top-label" : "btn-label").label(b.text); };
+    opts.content = () => { ui.style(__l10nStyle(style === "btn-top" ? "btn-top-label" : "btn-label")).label(b.text); };
   } else if (b.width != null && btnWidth(b) > b.width) {
-    opts.content = () => { ui.style("wrap").paragraph(b.text, Math.max(20, b.width! - (PADX[style] ?? 44) - 4)); };
+    opts.content = () => { ui.style(__l10nStyle("wrap")).paragraph(b.text, Math.max(20, b.width! - (PADX[style] ?? 44) - 4)); };
   }
   const name = b.name ?? (b.lines ? b.lines.map((l) => l.text).join(". ") : b.text);
-  if (ui.style(style, s).id(b.id).button(name, opts) && fresh()) later(b.act);
+  if (ui.style(__l10nStyle(style), __l10nStyle(s)).id(b.id).button(name, opts) && fresh()) later(b.act);
 }
 /** Buttons at their own widths in rows wrapping at `width` (flex-wrap). */
 function flow(label: string, list: Btn[], width: number, gap = 12, justify: "start" | "center" = "start"): void {
@@ -140,13 +157,13 @@ function topbar(L0: Layout, compact = false): void {
   const tag = T("tagline");
   ui.row("topbar", () => {
     ui.row("brand", () => {
-      ui.style(h1).label("Wild Eights");
+      ui.style(__l10nStyle(h1)).label("Wild Eights");
       if (leftW - tw("Wild Eights", h1) - 16 > Math.min(160, tw(tag, "tagline"))) para(tag, leftW - tw("Wild Eights", h1) - 16, "tagline");
     }, { spacing: 16, align: "center" });
     ui.spacer();
-    if (name) ui.style("profile").label(nameW < tw(name, "profile") ? name.slice(0, 14) + "…" : name);
-    if (syncWord) ui.style(syncCls).label(syncWord);
-    button({ id: "btn-options", text: T("optionsBtn"), style: "btn-top", act: () => openMenu() });
+    if (name) ui.style(__l10nStyle("profile")).label(nameW < tw(name, "profile") ? name.slice(0, 14) + "…" : name);
+    if (syncWord) ui.style(__l10nStyle(syncCls)).label(syncWord);
+    button({ id: "btn-options", text: T("optionsBtn"), style: "btn-top", act: () => __l10nOptions() });
     button({ id: "btn-help-top", text: "?", name: T("helpTopTitle"), style: "btn-top", act: () => show("help") });
   }, { width: L0.inner, spacing: 8, align: "center" });
 }
@@ -188,8 +205,8 @@ function titleScreen(L0: Layout, w: number): void {
         draw: (r, st) => {
           const k = st.scale * big;
           draw.strokeRoundRect(r.x + 3 * k, r.y + 3 * k, r.width - 6 * k, r.height - 6 * k, 8 * big, "#f2f5f8", 5 * big);
-          draw.text(c.slice(0, 1), r.x + 10 * k, r.y + 4 * k, { size: 44 * k, color: "#f2f5f8" });
-          draw.text(c.slice(1), r.x + r.width / 2, r.y + r.height * 0.42, { size: 52 * k, color: "#f2f5f8", align: "center" });
+          draw.text(c.slice(0, 1), r.x + 10 * k, r.y + 4 * k, __l10nDrawOptions({ size: 44 * k, color: "#f2f5f8" }));
+          draw.text(c.slice(1), r.x + r.width / 2, r.y + r.height * 0.42, __l10nDrawOptions({ size: 52 * k, color: "#f2f5f8", align: "center" }));
         },
       });
     }
@@ -255,7 +272,7 @@ function challengesScreen(w: number): void {
 }
 function radioRow(label: string, legend: string, options: [string, number][], value: number, set: (v: number) => void, w: number): void {
   ui.column(`${label}-fs`, () => {
-    ui.style("legend").label(legend);
+    ui.style(__l10nStyle("legend")).label(legend);
     ui.row(label, () => {
       for (const [text, v] of options) button({ id: `${label}-${v}`, text, style: "btn-small", selected: v === value, act: () => set(v) });
     }, { spacing: 8, role: "radiogroup" });
@@ -282,7 +299,7 @@ function hostedScreen(w: number): void {
       { id: "btn-quick-join", text: T("quickJoin"), act: quickJoin, disabled: H.busy },
     ], w);
     ui.row("join-form", () => {
-      ui.style("text").label(T("tableCode"));
+      ui.style(__l10nStyle("text")).label(T("tableCode"));
       H.code = ui.textField("join-code", H.code, { maxChars: 32, width: Math.min(200, w - 200), placeholder: T("codePlaceholder") });
       if (ui.submitted("join-code") && fresh()) later(joinByCode);
       button({ id: "btn-join", text: T("join"), act: joinByCode, disabled: H.busy });
@@ -323,7 +340,7 @@ function resultsScreen(w: number): void {
   para(r.headline, w, "headline", "results-headline");
   const tw0 = Math.min(w, 520);
   ui.column("results-table", () => {
-    ui.style("caption").label(T("scoreBreakdown"));
+    ui.style(__l10nStyle("caption")).label(T("scoreBreakdown"));
     const cols = [tw0 * 0.5, tw0 * 0.25, tw0 * 0.25];
     const rowOf = (id: string, cells: string[], cls: string): void => {
       ui.row(id, () => cells.forEach((c, i) => ui.column(`${id}-${i}`, () => para(c, cols[i]! - 32, cls), { width: cols[i]! })), { style: "row-rule", width: tw0 });
@@ -347,9 +364,9 @@ function settingsScreen(w: number): void {
   const o = platform.options;
   const fw = Math.min(w, 520);
   ui.column("fs-look", () => {
-    ui.style("legend").label(T("appearance"));
+    ui.style(__l10nStyle("legend")).label(T("appearance"));
     ui.row("theme-row", () => {
-      ui.style("text").label(T("theme"));
+      ui.style(__l10nStyle("text")).label(T("theme"));
       const idx = Math.max(0, C.THEMES.findIndex((t) => t.id === o.theme));
       const next = ui.id("opt-theme").select(T("theme"), idx, C.THEMES.map((t) => ({ text: TN("themes", t.id, t.name) })));
       if (next !== idx) platform.setOption("theme", C.THEMES[next]!.id);
@@ -360,12 +377,12 @@ function settingsScreen(w: number): void {
     if (lefty !== o.leftHanded) platform.setOption("leftHanded", lefty);
   }, { style: "fieldset", width: fw, spacing: 10 });
   ui.column("fs-runtime", () => {
-    ui.style("legend").label(T("optionsLegend"));
+    ui.style(__l10nStyle("legend")).label(T("optionsLegend"));
     para(T("optionsNote"), fw - 34, "muted");
-    button({ id: "btn-open-options", text: T("optionsBtn"), act: () => openMenu() });
+    button({ id: "btn-open-options", text: T("optionsBtn"), act: () => __l10nOptions() });
   }, { style: "fieldset", width: fw, spacing: 10 });
   ui.column("fs-progress", () => {
-    ui.style("legend").label(T("progress"));
+    ui.style(__l10nStyle("legend")).label(T("progress"));
     flow("progress-actions", [
       { id: "btn-replay-tutorial", text: T("replayTutorial"), style: "btn-ghost", act: startLearn },
       { id: "btn-wipe", text: T("wipe"), style: "btn-danger", act: openWipe },
@@ -387,7 +404,7 @@ function helpScreen(w: number): void {
   ];
   gridOf("help-rules", arts, Math.min(900, w), 240, 14, (a, cw) => {
     ui.column(`art-${a[0]}`, () => {
-      ui.style("h3").label(a[0]);
+      ui.style(__l10nStyle("h3")).label(a[0]);
       for (const line of a[1].split("\n")) para(line, cw - 34, "text");
     }, { style: "article", width: cw, spacing: 6 });
   });
@@ -399,14 +416,14 @@ function recordsScreen(w: number): void {
   const d = platform.progress();
   para(T("recordsLine", { played: d.records.roundsPlayed, won: d.records.roundsWon, best: d.records.bestScore, streak: d.bestStreak }), w, "text");
   para(T("dailyDays", { n: d.dailyDays.length }), w, "text");
-  ui.style("h3").label(T("achievementsH"));
+  ui.style(__l10nStyle("h3")).label(T("achievementsH"));
   for (const a of C.ACHIEVEMENTS) {
     const got = !!d.achievements[a.id];
     const ad = TN("achievements", a.id, [a.name, a.desc]);
     para(`${got ? "★" : "☆"} ${ad[0]} — ${ad[1]}`, w, got ? "ach-got" : "ach", `ach-${a.id}`);
   }
   if (app.board && app.board.length) {
-    ui.style("h3").label(T("leaderboardH"));
+    ui.style(__l10nStyle("h3")).label(T("leaderboardH"));
     const tw0 = Math.min(w, 480);
     const cols = [60, tw0 - 160, 100];
     const rowOf = (id: string, cells: string[], cls: string): void => {
@@ -433,7 +450,7 @@ function cardButton(card: Card, legal: boolean, selected: boolean, onTurn: boole
       if (selected) draw.strokeRoundRect(rc.x - 4 * k, y - 4 * k, rc.width + 8 * k, rc.height + 8 * k, 11, "#ffb050", 3);
       draw.roundRect(rc.x, y, rc.width, rc.height, 8, st.hovered ? "#ffffff" : "#fdfdf8");
       draw.roundRect(rc.x, y, rc.width, 5 * k, 3, SUIT_INK[card.suit] ?? "#222222");
-      draw.text(text, rc.x + rc.width / 2, y + (rc.height - 22 * k) / 2 + 2 * k, { size: 19 * k, weight: 600, color: SUIT_INK[card.suit] ?? "#222222", align: "center" });
+      draw.text(text, rc.x + rc.width / 2, y + (rc.height - 22 * k) / 2 + 2 * k, __l10nDrawOptions({ size: 19 * k, weight: 600, color: SUIT_INK[card.suit] ?? "#222222", align: "center" }));
     },
   });
   if (r.activated && fresh()) { const id = card.id; later(() => { ui.setFocus(null); app.selected = id; rerender(); onCardChosen(id); }); }
@@ -535,15 +552,15 @@ function dialogs(L0: Layout): void {
   const opening = !fresh();
   if (d === "suit") {
     ui.dialog("suit-dialog", "", true, () => {
-      ui.style(L0.inner < 520 ? "h2-small" : "h2").label(T("declareSuit"));
+      ui.style(__l10nStyle(L0.inner < 520 ? "h2-small" : "h2")).label(T("declareSuit"));
       const items = suitOrder();
       const cw = Math.min(200, (Math.min(420, L0.inner) - 14) / 2);
       gridOf("suit-grid", items, cw * 2 + 14, cw, 14, (it, w, i) => {
         const name = T("suitOption", { suit: L.suitName(it.suit), n: it.n });
-        if (ui.style("suit-btn", { width: w }).id(i === 0 ? "dialog-first" : `suit-${it.suit}`).button(name, {
+        if (ui.style(__l10nStyle("suit-btn"), __l10nStyle({ width: w })).id(i === 0 ? "dialog-first" : `suit-${it.suit}`).button(name, {
           content: () => {
-            ui.style("suit-glyph", { text: { color: SUIT_INK[it.suit] } }).label(suitGlyph(it.suit));
-            ui.style("suit-name").label(name);
+            ui.style(__l10nStyle("suit-glyph"), __l10nStyle({ text: { color: SUIT_INK[it.suit] } })).label(suitGlyph(it.suit));
+            ui.style(__l10nStyle("suit-name")).label(name);
           },
         }) && fresh()) { const suit: Suit = it.suit; later(() => declare(suit)); }
       });
@@ -551,10 +568,10 @@ function dialogs(L0: Layout): void {
   } else if (d === "pause") {
     const open = ui.dialog("pause-dialog", "", true, () => {
       ui.column("pause-col", () => {
-        ui.style("h2").label(T("paused"));
+        ui.style(__l10nStyle("h2")).label(T("paused"));
         const list: Btn[] = [
           { id: "dialog-first", text: T("resume"), style: "btn-primary", act: resume },
-          { id: "btn-pause-options", text: T("optionsBtn"), act: () => openMenu() },
+          { id: "btn-pause-options", text: T("optionsBtn"), act: () => __l10nOptions() },
           { id: "btn-pause-help", text: T("howToPlay"), act: () => { closeDialog(); show("help"); app.stack = ["game" as Screen]; } },
         ];
         if (!session?.hosted) list.push({ id: "btn-restart-round", text: T("restartRound"), act: restartRound });

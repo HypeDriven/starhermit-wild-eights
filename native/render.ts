@@ -1,3 +1,5 @@
+// localization-runtime:attached
+import { localizedCanvasFont as __l10nCanvasFont } from "./l10n/font.ts";
 // The railway-compartment card table on starhermit:scene, as the browser
 // build's ui.js drew it with three.js r185: a round felt table in a wood skirt
 // and bumper rail with a brass inlay, the moquette carpet far below, a brass
@@ -119,7 +121,7 @@ function cardFaceTexture(card: Card): Texture {
   const color = SUIT_COLORS[suitPalette][suitIdx]!;
   const rank = W.rankName(card.rank);
   g.fillStyle = color;
-  g.font = "bold 30px serif";
+  g.font = __l10nCanvasFont("bold 30px serif");
   g.textAlign = "left"; g.textBaseline = "top";
   g.fillText(rank, 9, 8);
   g.save();
@@ -165,7 +167,7 @@ function cardBackTexture(): Texture {
   g.strokeStyle = "#e8c890"; g.lineWidth = 2;
   g.beginPath(); g.arc(64, 90, 22, 0, Math.PI * 2); g.stroke();
   g.fillStyle = "#e8c890";
-  g.font = "bold 28px serif";
+  g.font = __l10nCanvasFont("bold 28px serif");
   g.textAlign = "center"; g.textBaseline = "middle";
   g.fillText("8", 64, 92);
   const tex = finishTexture(c);
