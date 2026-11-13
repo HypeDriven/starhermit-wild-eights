@@ -1,6 +1,6 @@
 # Wild Eights — running specification (StarHermit engine)
 
-Wild Eights is a StarHermit engine script game (engine 1.38.0, host API minor 37): one package
+Wild Eights is a StarHermit engine script game (engine 1.39.0, host API minor 39): one package
 (`native/main.ts` entry) played natively by the StarHermit client and in browsers through the
 engine's web runtime (`index.html` loader + `starhermit-files.json`, written by `npm run package`).
 
