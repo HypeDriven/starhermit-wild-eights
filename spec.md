@@ -1,6 +1,6 @@
 # Wild Eights — running specification (StarHermit engine)
 
-Wild Eights is a StarHermit engine script game (engine 1.39.0, host API minor 39): one package
+Wild Eights is a StarHermit engine script game (engine 1.44.1, host API minor 44): one package
 (`native/main.ts` entry) played natively by the StarHermit client and in browsers through the
 engine's web runtime (`index.html` loader + `starhermit-files.json`, written by `npm run package`).
 
@@ -287,7 +287,7 @@ No module may mutate rules state except through a validated command. Rendering c
 
 - Show useful progress by asset group; load core rules/UI first and scenic assets lazily. Provide procedural low-detail substitutes if optional assets fail.
 - Cache immutable hashed assets and the last safe local snapshot. Updates activate between rounds, never during one.
-- Recover WebGL context by rebuilding GPU resources from retained CPU descriptors. If 3D is unavailable, present a clear compatibility message and preserve account/session state.
+- Recover the graphics device by rebuilding GPU resources from retained CPU descriptors. If WebGPU is unavailable in a browser, present a clear compatibility message and preserve account/session state.
 - Background tabs reduce rendering to zero or a low heartbeat while preserving required network lifecycle.
 
 ## 6. StarHermit integration
@@ -388,3 +388,9 @@ The options panel includes Sound controls for master, music, effects and UI volu
 The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-SG`, `en-HK`, `en-BQ`, `es-CO`, `de-IT`, `fr-IT`, `es-CL`, `es-AR`, `es-EC`, `de-BR`. These reuse the corresponding existing translations in their language family. The runtime can resolve the exact regional tag. Language selection is available from the game’s Options panel or F2 and is saved per player in `ui.language`. Changes apply during play. Additional national, regional and indigenous language packs are only shipped once every English message has a translation with intact placeholders and markup. Complete additional language tables: `ja-JP`, `nl-BE`, `zh-SG`, `ms-SG`, `zh-HK`, `yue-HK`, `nl-NL`, `fi-FI`, `sv-FI`, `et-EE`, `vi-VN`, `id-ID`, `ta-SG`, `da-DE`, `lb-BE`, `eu-FR`, `ca-FR`, `oc-FR`, `sl-IT`, `fur-IT`, `ca-IT`, `oc-IT`, `ru-FI`, `ca-ES`, `eu-ES`, `gl-ES`, `ru-EE`, `su-ID`, `co-FR`, `bew-ID`, `km-VN`.
 
 <!-- regional-localization:end -->
+
+## Engine 1.44.1
+
+Browser play uses the WebGPU-only StarHermit 1.44.1 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+
+Toasts use native engine stacking, styling, accessibility and lifetime management.

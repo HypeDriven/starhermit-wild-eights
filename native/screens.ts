@@ -132,7 +132,6 @@ export function drawScreens(): { x: number; y: number; w: number; h: number } | 
     else menuScreen(L0);
   }, { width: L0.lw, height: L0.lh, align: "center", spacing: 0 });
   dialogs(L0);
-  toasts(L0);
   if (app.focusNext) {
     const age = f.frame - app.openedFrame;
     if (age >= 1) ui.setFocus(app.focusNext);
@@ -592,12 +591,4 @@ function dialogs(L0: Layout): void {
     });
     if (!open && !opening) later(closeDialog);
   }
-}
-function toasts(L0: Layout): void {
-  if (!app.toasts.length) return;
-  ui.place("toasts", { anchor: "bottom", y: L0.short ? 12 : 120 }, () => {
-    for (const [i, t] of app.toasts.entries()) {
-      ui.column(`toast-${i}`, () => para(t.text, Math.min(420, L0.inner - 40), "toast-text"), { style: "toast" });
-    }
-  }, { spacing: 8, align: "center" });
 }
