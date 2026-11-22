@@ -459,6 +459,7 @@ scene.environmentIntensity = 0.3;
 function applyPost(): void {
   if (!q) return;
   renderer.antialias = q.antialias;
+  renderer.motionBlur = q.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   renderer.bloom = q.bloom === null ? null : { strength: 0.45, radius: 0.4, threshold: 1.35, resolution: q.bloom };
   const ao = q.ao, fullAo = !!ao && ao.resolution >= 1; // the engine's AO "high" is full resolution
   renderer.ao = ao && {
