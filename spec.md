@@ -1,6 +1,6 @@
 # Wild Eights — running specification (StarHermit engine)
 
-Wild Eights is a StarHermit engine script game (engine 1.50.0, host API minor 50): one package
+Wild Eights is a StarHermit engine script game (engine 1.51.0, host API minor 51): one package
 (`native/main.ts` entry) played natively by the StarHermit client and in browsers through the
 engine's web runtime (`index.html` loader + `starhermit-files.json`, written by `npm run package`).
 
@@ -389,9 +389,9 @@ The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-S
 
 <!-- regional-localization:end -->
 
-## Engine 1.50.0
+## Engine 1.51.0
 
-Browser play uses the StarHermit 1.50.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+Browser play uses the StarHermit 1.51.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
 
 Toasts use native engine stacking, styling, accessibility and lifetime management.
 
