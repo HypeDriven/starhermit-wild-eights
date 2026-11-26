@@ -36,7 +36,7 @@
     "native/render.ts": {"sha256": "a9de5eba1cb66d379db8795b6adf7ece0f8d86597d7b69bff940954fa8b85bce", "size": 34342},
     "native/screens.ts": {"sha256": "f31a08e2041265774a5803246e9f1172fea955d51ae69edbafb436bba02e35e8", "size": 33860},
     "native/style.ts": {"sha256": "5d69b68bbfaa20e8ec2d06af7b890ed8847ee0dc149b4e5e361b230bca989611", "size": 2703},
-    "publication.json": {"sha256": "ace92e296aec04ff8ab68baaa7982802f7541ca1e4594c784681bcf270dd9541", "size": 4121},
+    "publication.json": {"sha256": "e257f71e91aa04d2550d3a2da5760893d14217354c0607eefc20ed171ff825a7", "size": 4121},
     "server.js": {"sha256": "dc26d1cbcceaa32278dad93d12d66ceff9a06b79a0f79142a7a39e7fe1f5537f", "size": 31682},
     "sfx/card-draw.opus": {"sha256": "d55a8cb0a30c094753ce8815a660445518f9b5d0acd90f08b8b25906e919112d", "size": 12444},
     "sfx/card-play-felt.opus": {"sha256": "49625c70b0f66aea23fb65db246c91ac3107ae897be2b4d4275e7909cf4ec832", "size": 13020},
