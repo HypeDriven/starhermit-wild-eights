@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T09:42:55.598294+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-26T16:16:50.480901+00:00",
+    "coverArtUpdatedAt": "2026-11-26T22:58:44.817614+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-26T16:16:50.460579+00:00",
+      "deployedAt": "2026-11-26T22:58:44.798704+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.50.0",
+      "engineVersion": "1.51.0",
       "deployWarning": null
     },
     "description": "Match cards by suit or rank, use wild eights to change suit, and be the first to empty your hand.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-26T16:16:49.621Z",
-  "sourceCommit": "adee65057e21ff31dc39a27f75ac97023f171feb",
-  "bytesReceived": 1609274,
-  "archiveSha256": "77d35162da00c8611feb37300ac8adcee57e6766bb5b7f5ed37e2550e5013b7c",
+  "publishedAt": "2026-11-26T22:58:45.177Z",
+  "sourceCommit": "39620cf1eaf28836f32a9f7a7dbee092e0587d9b",
+  "bytesReceived": 1609222,
+  "archiveSha256": "b6e743a137419d67d444800570210ad4726550ca9f8794c36a98071811d9e878",
   "indexSha256": "65e07c9e1488c128de20b33fd636a75cb418f55424e5707c3ccd804219297406",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 1609274,
+    "bytesReceived": 1609222,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.50.0",
+    "engineVersion": "1.51.0",
     "deployWarning": null
   },
   "liveVerification": {
