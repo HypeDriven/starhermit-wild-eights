@@ -19,7 +19,7 @@
     "favicon.png.ktx2": {"sha256": "0693b6c511e6e2ce89981e989c8de83b2e42e620a0d87530a20af5b75216f211", "size": 87776},
     "icon.png": {"sha256": "f345edd0f7b52ca83c191313028ddbf4e2196778689fc155c86cebfc6b1f12a7", "size": 10553},
     "icon.png.ktx2": {"sha256": "4b4ef1f4c4f4a42e4ae3538219124c6e1bc94a21a6c5df816e544a07f070d132", "size": 87776},
-    "index.html": {"sha256": "8779bd7e930e071faa0d3646412ca521b9c5c072350f8856564255ecf5b50185", "size": 1781},
+    "index.html": {"sha256": "d761bc5dacfff807f198ba370c35164a6e06c919508116184bb735c7666b0888", "size": 1781},
     "js/content.js": {"sha256": "98b4b9b309bfa7d7198243e12c27a7a8feac89dc6407766370d22104d4655119", "size": 6586},
     "js/game.js": {"sha256": "45153163fa13cd7e43b35875fbef9c6b764d9da9fa48b6de9f7b67b2122bac84", "size": 17399},
     "js/online.js": {"sha256": "b1ba94d9ca24fddca19eafe2463e6f39bad325fb24089aca6bfb8b823a3ab8a8", "size": 9092},
@@ -36,7 +36,7 @@
     "native/render.ts": {"sha256": "a9de5eba1cb66d379db8795b6adf7ece0f8d86597d7b69bff940954fa8b85bce", "size": 34342},
     "native/screens.ts": {"sha256": "f31a08e2041265774a5803246e9f1172fea955d51ae69edbafb436bba02e35e8", "size": 33860},
     "native/style.ts": {"sha256": "5d69b68bbfaa20e8ec2d06af7b890ed8847ee0dc149b4e5e361b230bca989611", "size": 2703},
-    "publication.json": {"sha256": "30b1ec75e21ab30833d5e2686e8887d34ab966da41f385a8c57a695e385898fb", "size": 4121},
+    "publication.json": {"sha256": "0d3f9fc18469852a709b7b731bc569d5a6074bc51e97d85f76e1f4101466f07a", "size": 4121},
     "server.js": {"sha256": "dc26d1cbcceaa32278dad93d12d66ceff9a06b79a0f79142a7a39e7fe1f5537f", "size": 31682},
     "sfx/card-draw.opus": {"sha256": "d55a8cb0a30c094753ce8815a660445518f9b5d0acd90f08b8b25906e919112d", "size": 12444},
     "sfx/card-play-felt.opus": {"sha256": "49625c70b0f66aea23fb65db246c91ac3107ae897be2b4d4275e7909cf4ec832", "size": 13020},
@@ -52,7 +52,7 @@
     "sfx/ui-select-tick.opus": {"sha256": "73b56f6d3a7e4a5f69c51ad4bc02d468f2e31bee6dd9c56bdd579f1210230677", "size": 11318},
     "sfx/victory-fanfare.opus": {"sha256": "04cdc7d7a24a427df5e4b0b664968f1ce4511ddde4fae90f5adb1ecaa01bb60e", "size": 40679},
     "sfx/wild-eight-chime.opus": {"sha256": "0665cba157f2e2e76811440f3d980f1bb219571c17855666f59d7e5057292046", "size": 27827},
-    "starhermit.txt": {"sha256": "2add1aa8b96462c65c301632dc1d7b1ddc8d48f87db8a0c529505b2c71c12a2d", "size": 1983}
+    "starhermit.txt": {"sha256": "47e841f187a6ef5af69efaa243e8d1154bc00893f993ce9b92947e1f36f167be", "size": 1983}
   },
   "excluded": ["LICENSE.md", "coverart.png", "favicon.svg", "package.json", "sfx/manifest.json", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
