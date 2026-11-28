@@ -665,16 +665,20 @@ export function setView(r: { x: number; y: number; w: number; h: number } | null
 export function reframe(): void { frameCamera(); camera.updateProjectionMatrix(); }
 const raycaster = new Raycaster();
 const ndc = new Vector2();
+const handTargets: Mesh[] = [];
 /** The local seat's card under a window point, or null. */
 export function pickCard(x: number, y: number): number | null {
   if (!active || !view || !view.onTurn) return null;
   if (x < rect.x || y < rect.y || x > rect.x + rect.w || y > rect.y + rect.h) return null;
   pointerToNdc(x, y, ndc);
   raycaster.setFromCamera(ndc, camera);
-  const hits = raycaster.intersectObjects(handMeshes.map((h) => h.mesh), false);
+  handTargets.length = handMeshes.length;
+  for (let i = 0; i < handMeshes.length; i++) handTargets[i] = handMeshes[i]!.mesh;
+  const hits = raycaster.intersectObjects(handTargets, false);
   if (!hits.length) return null;
-  const hit = handMeshes.find((h) => h.mesh === hits[0]!.object);
-  return hit ? hit.cardId : null;
+  const obj = hits[0]!.object;
+  for (let i = 0; i < handMeshes.length; i++) if (handMeshes[i]!.mesh === obj) return handMeshes[i]!.cardId;
+  return null;
 }
 export function setHover(id: number | null): void { if (id !== hovered) { hovered = id; dirty = true; } }
 export function isLegal(id: number): boolean { return !!view && view.legal.includes(id); }

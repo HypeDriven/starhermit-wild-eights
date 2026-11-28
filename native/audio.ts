@@ -108,12 +108,21 @@ export function loadSfx(): void {
       if (list.length) banks.set(ev, new SoundBank({ clips: list, order: "sequence", bus: "effects", gain: 0.8 }));
     });
   }
-  renderAmbience().then((c) => { ambClip = c; }, (e: unknown) => console.warn(`audio: ${String(e)}`));
-  renderMusic().then((c) => { musicClip = c; }, (e: unknown) => console.warn(`audio: ${String(e)}`));
 }
 
 /** Each frame: the loop voices once the mixer runs. */
+let __bedsStarted = false;
+function startBeds(): void {
+  if (__bedsStarted) return;
+  __bedsStarted = true;
+  void (async () => {
+    renderAmbience().then((c) => { ambClip = c; }, (e: unknown) => console.warn(`audio: ${String(e)}`));
+    renderMusic().then((c) => { musicClip = c; }, (e: unknown) => console.warn(`audio: ${String(e)}`));
+  })();
+}
+
 export function update(): void {
+  startBeds();
   if (context.state !== "running") return;
   if (ambClip && !ambVoice) { try { ambVoice = playClip(ambClip, { bus: "music", gain: 0.4, loop: true }); } catch { ambVoice = null; } }
   if (musicOn && musicClip && !musicVoice && ambVoice) {
